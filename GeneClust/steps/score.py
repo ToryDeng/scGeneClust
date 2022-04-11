@@ -10,6 +10,6 @@
 import pandas as pd
 
 
-def in_cluster_score(cluster_expr: pd.DataFrame, score='var', sort: bool = True):
+def in_cluster_score(cluster_expr: pd.DataFrame, score='var'):
     if score == 'var':
         return cluster_expr.var(axis=1).sort_values(ascending=False).reset_index()
