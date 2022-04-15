@@ -29,5 +29,5 @@ def reduce_dimension(
         embedding = umap.UMAP(n_components=n_componets).fit_transform(adata.T.X)
     else:
         raise NotImplementedError(f"{dr_method} has not been implemented!")
-    return pd.DataFrame(embedding, index=adata.var_names)
+    adata.varm[dr_method] = pd.DataFrame(embedding, index=adata.var_names)  # shape: (n_genes, n_comps)
 

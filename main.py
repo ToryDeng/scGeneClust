@@ -1,13 +1,17 @@
 import scanpy as sc
 from GeneClust import select
 
-
-# 1000 cells, 5000 genes after log-norm
-
 test_adata = sc.datasets.pbmc3k()
+sc.pp.filter_cells(test_adata, min_genes=10)
+sc.pp.filter_genes(test_adata, min_cells=10)
 test_adata.X = test_adata.X.toarray()
 test_adata.raw = test_adata
-sc.pp.recipe_seurat(test_adata)
+sc.pp.normalize_total(test_adata)
+sc.pp.log1p(test_adata)
 
-selected = select(test_adata, n_selected_genes=201, dr_method='glm-pca', n_comps=50, similarity='pearson', n_clusters=200, return_genes=True)
+selected = select(test_adata, n_selected_genes=500, dr_method='pca', n_comps=50, similarity='spearman',
+                  n_clusters=200, in_cluster_score='m3drop', return_genes=True)
 print(selected)
+# TODO： in cluster: dropout / use expression regression  residual
+# TODO: umap
+

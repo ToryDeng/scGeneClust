@@ -7,22 +7,25 @@
 Metrics used to calculate the similarity between genes
 """
 import pandas as pd
+import anndata as ad
 from typing import Literal
 
 
 def compute_gene_similarity(
-        data: pd.DataFrame,
+        adata: ad.AnnData,
+        dr_method: str,
         metric: Literal['pearson', 'spearman', 'kendall']
-) -> pd.DataFrame:
+):
     """
-    Compute the similarity matrix for genes.
+    Compute the similarity matrix for genes and store it in adata.varp.
 
-    :param data: The latent representations of genes (columns)
+    :param adata: The anndata object
+    :param dr_method: The dimension reduction method
     :param metric: The similarity metric
     :return: The similarity matrix, in which each entry is the similarity between two genes
     """
     if metric in ('pearson', 'spearman', 'kendall'):
-        return data.corr(method=metric)
+        adata.varp[metric] = adata.varm[dr_method].T.corr(method=metric).abs()  # the cols represent genes after transpose
     else:
         raise NotImplementedError(f"Metric {metric} has not been implemented!")
 

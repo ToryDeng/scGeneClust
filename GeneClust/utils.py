@@ -3,10 +3,12 @@
 # @Author : Tory Deng
 # @File : utils.py
 # @Software: PyCharm
+import sys
 
 import anndata as ad
 from typing import Union
 import numpy as np
+import os
 import pandas as pd
 
 
@@ -30,3 +32,20 @@ def subset_adata(adata: ad.AnnData, selected_genes: Union[np.ndarray, pd.Index],
         copied_adata = adata.copy()
         subset_adata(copied_adata, selected_genes, inplace=True)
         return copied_adata
+
+
+class HiddenPrints:
+    """
+    Hide prints from terminal
+    """
+    def __enter__(self):
+        self._original_stdout = sys.stdout
+        self._original_stderr = sys.stderr
+        sys.stdout = open(os.devnull, 'w')
+        sys.stderr = open(os.devnull, 'w')
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout.close()
+        sys.stderr.close()
+        sys.stdout = self._original_stdout
+        sys.stderr = self._original_stderr
