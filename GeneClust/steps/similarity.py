@@ -10,13 +10,14 @@ import pandas as pd
 import numpy as np
 import anndata as ad
 from sklearn.feature_selection import mutual_info_regression
+from scipy.spatial import distance
 from typing import Literal
 
 
 def compute_gene_similarity(
         adata: ad.AnnData,
         dr_method: str,
-        metric: Literal['pearson', 'spearman', 'kendall','bayes_corr','mutual_info']
+        metric: Literal['pearson', 'spearman', 'kendall','bayes_corr','mutual_info','euclidean_dis','mahalanobis_dis']
 ):
     """
     Compute the similarity matrix for genes and store it in adata.varp.
@@ -32,6 +33,10 @@ def compute_gene_similarity(
         adata.varp[metric] = bayes_corr(adata.varm[dr_method])
     elif metric == 'mutual_info':
         adata.varp[metric] = mutual_info(adata.varm[dr_method])
+    elif metric == 'euclidean_dis':
+        adata.varp[metric] = euclidean_dis(adata.varm[dr_method])
+    elif metric == 'mahalanobis_dis':
+        adata.varp[metric] = mahalanobis_dis(adata.varm[dr_method])    
     else:
         raise NotImplementedError(f"Metric {metric} has not been implemented!")
 
@@ -66,17 +71,44 @@ def mutual_info(data: pd.DataFrame):
     similarity measure using mutual information
     :param data: rows: genes 
     """
- 
+    #empty similarity matrix. Column i is the mutual information between the i_th gene and all genes
+    simi_matrix = pd.DataFrame(columns = data.index, index = data.index)
+
+    #In each iteration, calculate the mi between i_th gene and all genes
     data = data.T 
     data_array = data.values
-    
-    #empty similarity matrix. Column i is the mutual information between the i_th gene and all genes
-    simi_matrix = pd.DataFrame(columns = data.columns, index = data.columns)
-  
-    #In each iteration, calculate the mi between i_th gene and all genes
     for i in range(len(data)):
         simi = mutual_info_regression(data_array, data[i])
         simi_matrix[i] = simi
 
+    return simi_matrix
+
+
+def euclidean_dis(data: pd.DataFrame):
+
+    """
+    similarity measure using euclidean distance
+    :param data: rows: genes 
+    """
+    simi_matrix = pd.DataFrame(columns = data.index, index = data.index)
+    for i in range(len(data)):
+        for j in range(len(data)):
+            simi_matrix.iloc[i,j] = distance.euclidean(data.iloc[i,],data.iloc[j,])
+   
+    return simi_matrix
+
+
+def mahalanobis_dis(data: pd.DataFrame):
+    """
+    similarity measure using mahalanobis distance
+    :param data: rows: genes 
+    """
+    simi_matrix = pd.DataFrame(columns = data.index, index = data.index)
+    V = np.cov(np.array(data).T)
+    IV = np.linalg.inv(V)
+    for i in range(len(data)):
+        for j in range(len(data)):
+            simi_matrix.iloc[i][j] = distance.mahalanobis(data.iloc[i,], data.iloc[j,], IV)
+    
     return simi_matrix
 
