@@ -47,11 +47,12 @@ def iteratively_select(adata: ad.AnnData, in_cluster_score, n_selected_genes, n_
     :return:
     """
     # construct the list of dataframes containing genes and their scores in each cluster, sorted by scores
-    gene_info = adata.var.copy().reset_index()
+    gene_info = adata.var.loc[adata.var['use_cluster'], :].copy().reset_index()
+    print(f"{n_clusters - len(gene_info['cluster_label'].unique())} of all {n_clusters} clusters were dropped.")
     use_cols = ('index', in_cluster_score)
     per_cluster_gene_scores = [
-        gene_info.loc[gene_info['cluster_labels'] == i, use_cols].sort_values(by=in_cluster_score, ascending=False)
-        for i in range(n_clusters)
+        gene_info.loc[gene_info['cluster_label'] == i, use_cols].sort_values(by=in_cluster_score, ascending=False)
+        for i in gene_info['cluster_label'].unique()
     ]
 
     # select genes from each cluster
@@ -72,7 +73,8 @@ def select(adata: ad.AnnData,
            n_selected_genes: int,
            dr_method: Literal['pca', 'glm-pca', 'umap'],
            n_comps: int,
-           similarity: Literal['pearson', 'spearman', 'kendall'],
+           similarity: Literal['pearson', 'spearman', 'kendall', 'bayes_corr', 'mutual_info'],
+           clustering: Literal['agglomerative', 'gmm'],
            n_clusters: int,
            in_cluster_score: Literal['var', 'm3drop'],
            return_genes: bool = False
@@ -91,13 +93,15 @@ def select(adata: ad.AnnData,
     :return: Selected genes (an dataframe) or filtered anndata.
     """
     # dimension reduction
-    steps.reduce_dimension(adata, dr_method, n_comps)
+    adata = steps.reduce_dimension(adata, dr_method, n_comps)
     # calculate the similarity
     steps.compute_gene_similarity(adata, dr_method, similarity)
     # cluster genes
-    steps.clustering_genes(adata, similarity, n_clusters)
+    steps.clustering_genes(adata, dr_method, similarity, clustering, n_clusters)
     # calculate in-cluster scores for genes in each cluster
     steps.in_cluster_score(adata, in_cluster_score)
+    # calculate inter-cluster scores for each cluster
+    steps.inter_cluster_score(adata, in_cluster_score)
     # get selected genes
     selected_genes = iteratively_select(adata, in_cluster_score, n_selected_genes, n_clusters)
     # only preserve selected genes in adata

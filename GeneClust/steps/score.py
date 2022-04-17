@@ -7,6 +7,7 @@
 1. in-cluster scoring (how to rank genes in each cluster)
 2. (optional) inter-cluster scoring (how to rank clusters)
 """
+import numpy as np
 import pandas as pd
 import anndata2ri
 import anndata as ad
@@ -31,6 +32,14 @@ def in_cluster_score(adata: ad.AnnData, score: Literal['var', 'm3drop']):
         adata.var[score] = M3Drop_compute_importance(adata)['importance']
     else:
         raise NotImplementedError(f"{score} has not been implemented!")
+
+
+def inter_cluster_score(adata: ad.AnnData, intra_score: Literal['var', 'm3drop']):
+    for cluster in adata.var['cluster_label'].unique():
+        cluster_mask = adata.var['cluster_label'] == cluster
+        sorted_scores = adata.var.loc[cluster_mask, intra_score].sort_values(ascending=False)
+        adata.var.loc[cluster_mask, 'cluster_score'] = sorted_scores.mean() if len(sorted_scores) <= 3 else sorted_scores[:3].mean()
+    adata.var['use_cluster'] = adata.var['cluster_score'] >= adata.var['cluster_score'].quantile(0.1)
 
 
 def M3Drop_compute_importance(adata: ad.AnnData) -> Optional[pd.DataFrame]:

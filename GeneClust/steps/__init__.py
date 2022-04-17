@@ -7,4 +7,4 @@
 from .decomposition import reduce_dimension
 from .similarity import compute_gene_similarity
 from .cluster import clustering_genes
-from .score import in_cluster_score
+from .score import in_cluster_score, inter_cluster_score
