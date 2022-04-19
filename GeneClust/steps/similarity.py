@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 import anndata as ad
 from sklearn.feature_selection import mutual_info_regression
-from scipy.spatial import distance
+from scipy.spatial.distance import pdist, squareform
 from typing import Literal
 
 
@@ -47,7 +47,6 @@ def bayes_corr(data: pd.DataFrame):
     similarity measure using Bayesian correlation 
     :param data: rows: genes 
     """
-
     nrowsX = data.shape[0]
     ncolsX = data.shape[1]
     alpha0 = [1 / nrowsX] * ncolsX
@@ -74,27 +73,20 @@ def mutual_info(data: pd.DataFrame):
     """
     # empty similarity matrix. Column i is the mutual information between the i_th gene and all genes
     simi_matrix = pd.DataFrame(columns=data.index, index=data.index)
-
     # In each iteration, calculate the mi between i_th gene and all genes
-    data = data.T
+    #data_array shape(ngene, ncell)
     data_array = data.values
     for i in range(len(data)):
-        simi_matrix[i] = mutual_info_regression(data_array, data[i])
-
+        simi_matrix[i] = mutual_info_regression(data_array.T, data.iloc[i,], random_state = 40)
     return simi_matrix
-
 
 def euclidean_dis(data: pd.DataFrame):
     """
     similarity measure using euclidean distance
     :param data: rows: genes
     """
-    simi_matrix = pd.DataFrame(columns=data.index, index=data.index)
-    for i in range(len(data)):
-        for j in range(len(data)):
-            simi_matrix.iloc[i, j] = distance.euclidean(data.iloc[i,], data.iloc[j,])
-
-    return simi_matrix
+    dist = pd.DataFrame(squareform(pdist(data, 'euclidean')), columns = data.index, index = data.index)
+    return dist
 
 
 def mahalanobis_dis(data: pd.DataFrame):
@@ -102,11 +94,5 @@ def mahalanobis_dis(data: pd.DataFrame):
     similarity measure using mahalanobis distance
     :param data: rows: genes
     """
-    simi_matrix = pd.DataFrame(columns=data.index, index=data.index)
-    V = np.cov(np.array(data).T)
-    IV = np.linalg.inv(V)
-    for i in range(len(data)):
-        for j in range(len(data)):
-            simi_matrix.iloc[i][j] = distance.mahalanobis(data.iloc[i,], data.iloc[j,], IV)
-
-    return simi_matrix
+    dist = pd.DataFrame(squareform(pdist(data, 'mahalanobis')), columns = data.index, index = data.index)
+    return dist
