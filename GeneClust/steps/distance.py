@@ -17,7 +17,7 @@ from sklearn.feature_selection import mutual_info_regression
 
 def compute_gene_distance(
         adata: ad.AnnData,
-        metric: Literal['pearson', 'spearman', 'kendall', 'bayesian', 'mutual_info', 'euclidean', 'mahalanobis']
+        metric: Literal['pearson', 'spearman', 'kendall', 'bayesian', 'euclidean', 'mahalanobis']
 ):
     """
     Compute the similarity matrix for genes and store it in adata.varp.
@@ -29,9 +29,7 @@ def compute_gene_distance(
     if metric in ('pearson', 'spearman', 'kendall'):  # cols represent genes after transpose
         adata.varp[metric] = 1 - adata.varm[adata.uns['dr_method']].T.corr(metric).abs()
     elif metric == 'bayesian':
-        adata.varp[metric] = bayes_corr(pd.DataFrame(adata.raw.X.T, index=adata.raw.var_names))
-    elif metric == 'mutual_info':
-        adata.varp[metric] = mutual_info(adata.varm[adata.uns['dr_method']])
+        adata.varp[metric] = 1 - bayes_corr(pd.DataFrame(adata.raw.X.T, index=adata.raw.var_names))
     elif metric == 'euclidean':
         adata.varp[metric] = euclidean_dis(adata.varm[adata.uns['dr_method']])
     elif metric == 'mahalanobis':
@@ -41,7 +39,7 @@ def compute_gene_distance(
     adata.uns['distance'] = metric
 
 
-def bayes_corr(data: pd.DataFrame):
+def bayes_corr(data: pd.DataFrame) -> pd.DataFrame:
     """
     similarity measure using Bayesian correlation 
     :param data: raw data (row:gene)
