@@ -3,19 +3,17 @@
 # @Author : Tory Deng
 # @File : functions.py
 # @Software: PyCharm
+from typing import Literal, List, Union
+
+import anndata as ad
+import numpy as np
 import pandas as pd
 
 import GeneClust.steps as steps
-import anndata as ad
-import numpy as np
-from typing import Literal, List, Union
 from .utils import subset_adata
 
 
-def select_genes_per_cluster(
-        per_cluster_df: List[pd.DataFrame],
-        n_selected_per_cluster: int
-) -> np.ndarray:
+def select_genes_per_cluster(per_cluster_df: List[pd.DataFrame], n_selected_per_cluster: int) -> np.ndarray:
     """
     Select top genes from each cluster.
 
@@ -36,28 +34,30 @@ def select_genes_per_cluster(
     return np.concatenate(per_cluster_selected_genes)
 
 
-def iteratively_select(adata: ad.AnnData, in_cluster_score, n_selected_genes, n_clusters):
+def iteratively_select(adata: ad.AnnData, n_selected_genes) -> np.ndarray:
     """
     Iteratively select genes from each cluster.
 
     :param adata: Anndata object.
-    :param in_cluster_score: The type of in-cluster score of genes.
     :param n_selected_genes: The number of genes to be selected.
-    :param n_clusters: The number of clusters that genes are clustered to.
     :return:
     """
     # construct the list of dataframes containing genes and their scores in each cluster, sorted by scores
-    gene_info = adata.var.loc[adata.var['use_cluster'], :].copy().reset_index()
-    print(f"{n_clusters - len(gene_info['cluster_label'].unique())} of all {n_clusters} clusters were dropped.")
-    use_cols = ('index', in_cluster_score)
+    n_total_clusters = adata.var['cluster_label'].unique().shape[0]
+    preserved_genes = adata.var.loc[adata.var['use_cluster'], :].copy().reset_index()
+    preserved_clusters = preserved_genes['cluster_label'].unique()
+
+    print(f"{n_total_clusters - preserved_clusters.shape[0]} of all {n_total_clusters} clusters were dropped.")
+    use_cols = ('index', adata.uns['intra_cluster_score'])
     per_cluster_gene_scores = [
-        gene_info.loc[gene_info['cluster_label'] == i, use_cols].sort_values(by=in_cluster_score, ascending=False)
-        for i in gene_info['cluster_label'].unique()
+        preserved_genes.loc[preserved_genes['cluster_label'] == i, use_cols].sort_values(
+            by=adata.uns['intra_cluster_score'], ascending=False
+        ) for i in preserved_clusters
     ]
 
     # select genes from each cluster
     # first-round selection: select n_selected_genes // n_clusters genes from each cluster
-    selected_genes = select_genes_per_cluster(per_cluster_gene_scores, n_selected_genes // n_clusters)
+    selected_genes = select_genes_per_cluster(per_cluster_gene_scores, n_selected_genes // n_total_clusters)
     # if lack some genes, keep selecting from each cluster
     while selected_genes.shape[0] < n_selected_genes:
         single_selection = select_genes_per_cluster(per_cluster_gene_scores, 1)
@@ -73,10 +73,11 @@ def select(adata: ad.AnnData,
            n_selected_genes: int,
            dr_method: Literal['pca', 'glm-pca', 'umap'],
            n_comps: int,
-           similarity: Literal['pearson', 'spearman', 'kendall', 'bayes_corr', 'mutual_info', 'euclidean_dis', 'mahalanobis_dis'],
+           distance: Literal['pearson', 'spearman', 'kendall', 'bayesian', 'euclidean', 'mahalanobis'],
            clustering: Literal['agglomerative', 'gmm'],
            n_clusters: int,
-           in_cluster_score: Literal['var', 'm3drop'],
+           in_cluster_score: Literal['m3drop', 'seurat'],
+           inter_cluster_score: Literal['top3', 'silhouette'],
            return_genes: bool = False
            ) -> Union[pd.DataFrame, ad.AnnData]:
     """
@@ -86,24 +87,27 @@ def select(adata: ad.AnnData,
     :param n_selected_genes: The number of genes to be selected.
     :param dr_method: The dimension reduction method.
     :param n_comps: The number of components to be used.
-    :param similarity: The similarity metric.
+    :param distance: The distance metric.
+    :param clustering: The clustering method.
     :param n_clusters: The number of clusters that genes are clustered to.
-    :param in_cluster_score: The type of in-cluster score of genes.
-    :param return_genes: Bool. whether return the selected genes (a dataframe), or the filtered anndata object.
+    :param in_cluster_score: The type of in-cluster score of genes in each cluster.
+    :param inter_cluster_score: The type of inter-cluster score of each cluster.
+    :param return_genes: Bool. Whether return the selected genes (a dataframe), or the filtered anndata object.
     :return: Selected genes (an dataframe) or filtered anndata.
     """
     # dimension reduction
     adata = steps.reduce_dimension(adata, dr_method, n_comps)
-    # calculate the similarity
-    steps.compute_gene_similarity(adata, dr_method, similarity)
+    # calculate the distance. when using gmm and the inter_cluster_score is not silhouette score, we don't compute
+    if clustering != 'gmm' or inter_cluster_score == 'silhouette':
+        steps.compute_gene_distance(adata, distance)
     # cluster genes
-    steps.clustering_genes(adata, dr_method, similarity, clustering, n_clusters)
+    steps.clustering_genes(adata, clustering, n_clusters)
     # calculate in-cluster scores for genes in each cluster
     steps.in_cluster_score(adata, in_cluster_score)
     # calculate inter-cluster scores for each cluster
-    steps.inter_cluster_score(adata, in_cluster_score)
+    steps.inter_cluster_score(adata, inter_cluster_score)
     # get selected genes
-    selected_genes = iteratively_select(adata, in_cluster_score, n_selected_genes, n_clusters)
+    selected_genes = iteratively_select(adata, n_selected_genes)
     # only preserve selected genes in adata
     filtered_adata = subset_adata(adata, selected_genes, inplace=False)
     return filtered_adata.var_names.to_frame(index=False, name='Gene') if return_genes else filtered_adata

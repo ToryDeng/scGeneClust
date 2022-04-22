@@ -4,42 +4,58 @@
 # @File : score.py
 # @Software: PyCharm
 """
-1. in-cluster scoring (how to rank genes in each cluster)
-2. (optional) inter-cluster scoring (how to rank clusters)
+1. intra-cluster scoring (how to rank genes in each cluster)
+2. inter-cluster scoring (how to rank clusters)
 """
-import numpy as np
-import pandas as pd
-import anndata2ri
-import anndata as ad
 import traceback
 from typing import Optional, Literal
+
+import anndata as ad
+import scanpy as sc
+import anndata2ri
+import pandas as pd
 from rpy2.robjects import r, globalenv
 from rpy2.robjects.packages import importr
+from sklearn.metrics import silhouette_samples
+
 from GeneClust.utils import HiddenPrints
 
 
-def in_cluster_score(adata: ad.AnnData, score: Literal['var', 'm3drop']):
+def in_cluster_score(adata: ad.AnnData, score: Literal['m3drop', 'seurat']):
     """
     Compute the scores for each gene in a cluster.
 
     :param adata: The anndata object.
     :param score: Which kind of score to use.
     """
-    if score == 'var':
-        adata.var[score] = adata.X.var(axis=0)
-        # return cluster_expr.var(axis=1).sort_values(ascending=False).reset_index()
-    elif score == 'm3drop':
+    if score == 'm3drop':
         adata.var[score] = M3Drop_compute_importance(adata)['importance']
+    elif score == 'seurat':
+        adata.var[score] = sc.pp.highly_variable_genes(
+            adata.raw.to_adata(), n_top_genes=adata.n_vars // 2, flavor='seurat_v3', inplace=False
+        )['variances_norm']
     else:
         raise NotImplementedError(f"{score} has not been implemented!")
+    adata.uns['intra_cluster_score'] = score
 
 
-def inter_cluster_score(adata: ad.AnnData, intra_score: Literal['var', 'm3drop']):
-    for cluster in adata.var['cluster_label'].unique():
-        cluster_mask = adata.var['cluster_label'] == cluster
-        sorted_scores = adata.var.loc[cluster_mask, intra_score].sort_values(ascending=False)
-        adata.var.loc[cluster_mask, 'cluster_score'] = sorted_scores.mean() if len(sorted_scores) <= 3 else sorted_scores[:3].mean()
-    adata.var['use_cluster'] = adata.var['cluster_score'] >= adata.var['cluster_score'].quantile(0.1)
+def inter_cluster_score(adata: ad.AnnData, inter_score: Literal['top3', 'silhouette']):
+    if inter_score == 'silhouette':
+        sample_silhouette_values = silhouette_samples(
+            X=adata.varp[adata.uns['distance']], labels=adata.var['cluster_label'], metric='precomputed'
+        )
+        for cluster in adata.var['cluster_label'].unique():
+            cluster_mask = adata.var['cluster_label'] == cluster
+            adata.var.loc[cluster_mask, 'cluster_score'] = sample_silhouette_values[cluster_mask].mean()
+    elif inter_score == 'top3':
+        for cluster in adata.var['cluster_label'].unique():
+            cluster_mask = adata.var['cluster_label'] == cluster
+            sorted_scores = adata.var.loc[cluster_mask, adata.uns['intra_cluster_score']].sort_values(ascending=False)
+            if len(sorted_scores) <= 3:
+                adata.var.loc[cluster_mask, 'cluster_score'] = sorted_scores.mean()
+            else:
+                adata.var.loc[cluster_mask, 'cluster_score'] = sorted_scores.iloc[:3].mean()
+    adata.var['use_cluster'] = adata.var['cluster_score'] >= adata.var['cluster_score'].quantile(0.2)
 
 
 def M3Drop_compute_importance(adata: ad.AnnData) -> Optional[pd.DataFrame]:

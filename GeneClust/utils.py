@@ -3,16 +3,16 @@
 # @Author : Tory Deng
 # @File : utils.py
 # @Software: PyCharm
+import os
 import sys
+from typing import Union, Optional
 
 import anndata as ad
-from typing import Union
 import numpy as np
-import os
 import pandas as pd
 
 
-def subset_adata(adata: ad.AnnData, selected_genes: Union[np.ndarray, pd.Index], inplace=False):
+def subset_adata(adata: ad.AnnData, selected_genes: Union[np.ndarray, pd.Index], inplace=False) -> Optional[ad.AnnData]:
     if isinstance(selected_genes, pd.Index):
         selected_genes = selected_genes.to_numpy()
     gene_mask = adata.var_names.isin(selected_genes)
