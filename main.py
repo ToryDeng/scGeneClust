@@ -10,10 +10,8 @@ sc.pp.normalize_total(test_adata)
 sc.pp.log1p(test_adata)
 test_adata.uns['data_name'] = 'pbmc3k'
 
-selected = select(test_adata, n_selected_genes=500, dr_method='pca', n_comps=50, distance='bayesian',
-                  clustering='gmm', n_clusters=200, in_cluster_score='m3drop', inter_cluster_score='top3',
+selected = select(test_adata, n_selected_genes=500, dr_method='pca-umap', n_comps=50, distance='bayesian',
+                  clustering='gmm', n_clusters=200, in_cluster_score='center', inter_cluster_score='top3',
                   return_genes=True)
 print(selected)
-
-# TODO: umap
 

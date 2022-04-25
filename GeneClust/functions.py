@@ -71,12 +71,12 @@ def iteratively_select(adata: ad.AnnData, n_selected_genes) -> np.ndarray:
 
 def select(adata: ad.AnnData,
            n_selected_genes: int,
-           dr_method: Literal['pca', 'glm-pca', 'umap'],
+           dr_method: Literal['pca', 'umap', 'pca-umap'],
            n_comps: int,
            distance: Literal['pearson', 'spearman', 'kendall', 'bayesian', 'euclidean', 'mahalanobis'],
-           clustering: Literal['agglomerative', 'gmm'],
+           clustering: Literal['agg', 'gmm'],
            n_clusters: int,
-           in_cluster_score: Literal['m3drop', 'seurat'],
+           in_cluster_score: Literal['m3drop', 'seurat', 'center'],
            inter_cluster_score: Literal['top3', 'silhouette'],
            return_genes: bool = False
            ) -> Union[pd.DataFrame, ad.AnnData]:

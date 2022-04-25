@@ -17,20 +17,22 @@ from sklearn.mixture import GaussianMixture
 
 def clustering_genes(
         adata: ad.AnnData,
-        clustering: Literal['agglomerative', 'gmm'],
+        clustering: Literal['agg', 'gmm'],
         n_clusters: int
 ):
-    if clustering == 'agglomerative':
+    if clustering == 'agg':
         adata.var['cluster_label'] = AgglomerativeClustering(
             affinity='precomputed',
             n_clusters=n_clusters,
             linkage='average'
         ).fit_predict(adata.varp[adata.uns['distance']])
     elif clustering == 'gmm':
-        adata.var['cluster_label'] = GaussianMixture(
+        model = GaussianMixture(
             n_components=n_clusters,
             max_iter=200
-        ).fit_predict(adata.varm[adata.uns['dr_method']])
+        )
+        adata.var['cluster_label'] = model.fit_predict(adata.varm[adata.uns['dr_method']])
+        adata.uns['cluster_centroid'] = model.means_
     else:
         raise NotImplementedError(f"{clustering} has not been implemented!")
     cluster_counts = adata.var['cluster_label'].value_counts(ascending=False)
