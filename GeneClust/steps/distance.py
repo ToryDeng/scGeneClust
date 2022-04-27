@@ -13,11 +13,11 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.distance import pdist, squareform
 from sklearn.feature_selection import mutual_info_regression
-
+import compositional as comp
 
 def compute_gene_distance(
         adata: ad.AnnData,
-        metric: Literal['pearson', 'spearman', 'kendall', 'bayesian', 'euclidean', 'mahalanobis']
+        metric: Literal['pearson', 'spearman', 'kendall', 'bayesian', 'euclidean', 'mahalanobis', 'rho_p', 'phi_s']
 ):
     """
     Compute the similarity matrix for genes and store it in adata.varp.
@@ -34,10 +34,13 @@ def compute_gene_distance(
         adata.varp[metric] = euclidean_dis(adata.varm[adata.uns['dr_method']])
     elif metric == 'mahalanobis':
         adata.varp[metric] = mahalanobis_dis(adata.varm[adata.uns['dr_method']])
+    elif metric == 'rho_p':
+        adata.varp[metric] = rho_p(pd.DataFrame(adata.raw.X, columns = adata.raw.var_names))
+    elif metric == 'rho_p':
+        adata.varp[metric] = phi_s(pd.DataFrame(adata.raw.X, columns = adata.raw.var_names))
     else:
         raise NotImplementedError(f"Metric {metric} has not been implemented!")
     adata.uns['distance'] = metric
-
 
 def bayes_corr(data: pd.DataFrame) -> pd.DataFrame:
     """
@@ -96,3 +99,28 @@ def mahalanobis_dis(data: pd.DataFrame):
     """
     dist = pd.DataFrame(squareform(pdist(data, 'mahalanobis')), columns=data.index, index=data.index)
     return dist
+
+def rho_p(data: pd.DataFrame):
+    """
+    similarity measure using rho_p
+    :param data: rows: genes
+    Citation:
+    * https://github.com/tpq/propr
+    * https://www.nature.com/articles/s41592-019-0372-4
+    """  
+    #replace zero values with non-zero smallest value
+    # data[data == 0] = min(data[data != 0].min()) 
+    #replace zero values with 1
+    data[data == 0] = min(data[data != 0].min()) 
+    return comp.pairwise_rho(data)
+
+def phi_s(data: pd.DataFrame):
+    """
+    similarity measure using phi_s
+    :param data: rows: genes
+    Citation:
+    * https://github.com/tpq/propr
+    * https://www.nature.com/articles/s41592-019-0372-4
+    """     
+    data[data == 0] = min(data[data != 0].min()) 
+    return comp.pairwise_phi(data)
