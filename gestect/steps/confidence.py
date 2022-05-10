@@ -37,17 +37,17 @@ def find_confident_cells(expr: np.ndarray,
         gmm_conf_expr = pd.DataFrame(expr)[gmm_is_confident]       #expr of confident cells after gmm
 
         #find mnn in each cluster
-        is_confident = pd.DataFrame(columns=['is_conf'], index=pd.DataFrame(expr).index)
-        is_confident['is_conf'] = False
-        for i in range(0, n_cell_clusters):                        #for each cluster
-            cluster_i = confident_cluster_label == i
+        
+        is_confident = np.array([False]*len(expr))
+        for i in np.unique(cluster_label):                         #for each cluster
+            cluster_i = confident_cluster_label == i 
             nbrs = NearestNeighbors(n_neighbors=10).fit(gmm_conf_expr[cluster_i])
             indices = nbrs.kneighbors(gmm_conf_expr, return_distance = False)
             for j in range(len(indices)):           
                 for neighbor in indices[j]:                        #find all neighbor of cell j
                     if j in indices[neighbor]:                     #if cell j is also the neighbor of its neighbor
-                        is_confident['is_conf'][list(gmm_conf_expr[cluster_i].index)[j]] = True
-                        is_confident['is_conf'][list(gmm_conf_expr[cluster_i].index)[neighbor]] = True
+                        is_confident[list(gmm_conf_expr[cluster_i].index)[j]] = True
+                        is_confident[list(gmm_conf_expr[cluster_i].index)[neighbor]] = True
         is_confident = np.array(is_confident['is_conf'])
     else:
         raise NotImplementedError(f"{how} has not been implemented!")
