@@ -25,7 +25,7 @@ def find_confident_cells(expr: np.ndarray,
         max_proba = cell_proba.max(1)
         is_confident = max_proba > 0.95
         cluster_label = cell_proba.argmax(1)
-    if how == 'mnn_proba':
+    elif how == 'mnn_proba':
         #find confident cells using gmm
         gmm = GaussianMixture(n_components=n_cell_clusters)
         gmm.fit(expr)
@@ -40,7 +40,7 @@ def find_confident_cells(expr: np.ndarray,
         is_confident = pd.DataFrame(columns=['is_conf'], index=pd.DataFrame(expr).index)
         is_confident['is_conf'] = False
         for i in range(0, n_cell_clusters):                        #for each cluster
-            cluster_i = cluster_label == i
+            cluster_i = confident_cluster_label == i
             nbrs = NearestNeighbors(n_neighbors=10).fit(gmm_conf_expr[cluster_i])
             indices = nbrs.kneighbors(gmm_conf_expr, return_distance = False)
             for j in range(len(indices)):           
