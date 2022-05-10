@@ -8,6 +8,11 @@ from typing import Literal, List, Union
 import anndata as ad
 import numpy as np
 import pandas as pd
+from rpy2.robjects.packages import importr
+from rpy2.robjects import r, numpy2ri, IntVector
+from sklearn.decomposition import NMF
+from sklearn.mixture import GaussianMixture
+import ClusterEnsembles as ce
 
 import GeneClust.steps as steps
 from .utils import subset_adata
@@ -34,24 +39,31 @@ def select_genes_per_cluster(per_cluster_df: List[pd.DataFrame], n_selected_per_
     return np.concatenate(per_cluster_selected_genes)
 
 
-def iteratively_select(adata: ad.AnnData, n_selected_genes) -> np.ndarray:
+def iteratively_select(adata: ad.AnnData,
+                       n_selected_genes: int,
+                       gene_cluster_rep: str = 'cluster_label',
+                       use_cluster_rep: str = 'use_cluster',
+                       intra_score_rep: str = 'intra_cluster_score',
+                       ) -> np.ndarray:
     """
-    Iteratively select genes from each cluster.
+    Iteratively select genes from each gene cluster.
 
+    :param use_cluster_rep:
+    :param gene_cluster_rep:
     :param adata: Anndata object.
     :param n_selected_genes: The number of genes to be selected.
     :return:
     """
     # construct the list of dataframes containing genes and their scores in each cluster, sorted by scores
-    n_total_clusters = adata.var['cluster_label'].unique().shape[0]
-    preserved_genes = adata.var.loc[adata.var['use_cluster'], :].copy().reset_index()
-    preserved_clusters = preserved_genes['cluster_label'].unique()
+    n_total_clusters = adata.var[gene_cluster_rep].unique().shape[0]
+    preserved_genes = adata.var.loc[adata.var[use_cluster_rep], :].copy().reset_index()
+    preserved_clusters = preserved_genes[gene_cluster_rep].unique()
 
     print(f"{n_total_clusters - preserved_clusters.shape[0]} of all {n_total_clusters} clusters were dropped.")
-    use_cols = ('index', adata.uns['intra_cluster_score'])
+    use_cols = ('index', adata.uns[intra_score_rep])
     per_cluster_gene_scores = [
-        preserved_genes.loc[preserved_genes['cluster_label'] == i, use_cols].sort_values(
-            by=adata.uns['intra_cluster_score'], ascending=False
+        preserved_genes.loc[preserved_genes[gene_cluster_rep] == i, use_cols].sort_values(
+            by=adata.uns[intra_score_rep], ascending=False
         ) for i in preserved_clusters
     ]
 
@@ -71,13 +83,14 @@ def iteratively_select(adata: ad.AnnData, n_selected_genes) -> np.ndarray:
 
 def select(adata: ad.AnnData,
            n_selected_genes: int,
-           dr_method: Literal['pca', 'umap', 'pca-umap'],
-           n_comps: int,
-           distance: Literal['pearson', 'spearman', 'kendall', 'bayesian', 'euclidean', 'mahalanobis', 'rho_p', 'phi_s'],
-           clustering: Literal['agg', 'gmm'],
-           n_clusters: int,
-           in_cluster_score: Literal['m3drop', 'seurat', 'center'],
-           inter_cluster_score: Literal['top3', 'silhouette'],
+           dr_method: Literal['pca', 'umap', 'pca-umap'] = 'pca',
+           n_comps: int = 50,
+           distance: Literal[
+               'pearson', 'spearman', 'kendall', 'bayesian', 'euclidean', 'mahalanobis', 'rho_p', 'phi_s'] = None,
+           clustering: Literal['agg', 'gmm', 'ms'] = 'gmm',
+           n_clusters: int = 300,
+           in_cluster_score: Literal['m3drop', 'seurat', 'center'] = 'center',
+           inter_cluster_score: Literal['top3', 'silhouette'] = 'silhouette',
            return_genes: bool = False
            ) -> Union[pd.DataFrame, ad.AnnData]:
     """
@@ -98,7 +111,10 @@ def select(adata: ad.AnnData,
     # dimension reduction
     adata = steps.reduce_dimension(adata, dr_method, n_comps)
     # calculate the distance. when using gmm and the inter_cluster_score is not silhouette score, we don't compute
-    if clustering != 'gmm' or inter_cluster_score == 'silhouette':
+    if (clustering in ('gmm', 'ms') and inter_cluster_score != 'silhouette') or (
+            clustering == 'agg' and distance == 'euclidean'):
+        pass
+    else:
         steps.compute_gene_distance(adata, distance)
     # cluster genes
     steps.clustering_genes(adata, clustering, n_clusters)

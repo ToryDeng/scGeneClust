@@ -4,4 +4,5 @@
 # @File : __init__.py.py
 # @Software: PyCharm
 
-from GeneClust.functions import select
+from .functions import select
+from .utils import load_example_adata

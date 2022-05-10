@@ -8,6 +8,7 @@ import sys
 from typing import Union, Optional
 
 import anndata as ad
+import scanpy as sc
 import numpy as np
 import pandas as pd
 
@@ -49,3 +50,18 @@ class HiddenPrints:
         sys.stderr.close()
         sys.stdout = self._original_stdout
         sys.stderr = self._original_stderr
+
+
+def load_example_adata() -> ad.AnnData:
+    example = sc.datasets.pbmc3k()
+    sc.pp.filter_cells(example, min_genes=200)
+    sc.pp.filter_genes(example, min_cells=3)  # 166
+    example.X = example.X.toarray()
+    example.raw = example
+    sc.pp.normalize_total(example)
+    example.layers['normalized'] = example.X.copy()
+    sc.pp.log1p(example)
+    example.layers['log-normalized'] = example.X.copy()
+    sc.pp.scale(example)
+    example.uns['data_name'] = 'pbmc3k'
+    return example

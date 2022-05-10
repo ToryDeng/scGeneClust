@@ -4,7 +4,7 @@
 # @File : distance.py
 # @Software: PyCharm
 """
-Metrics used to calculate the similarity between genes
+Metrics used to calculate the distance between genes
 """
 from typing import Literal
 
@@ -14,6 +14,7 @@ import pandas as pd
 from scipy.spatial.distance import pdist, squareform
 from sklearn.feature_selection import mutual_info_regression
 import compositional as comp
+
 
 def compute_gene_distance(
         adata: ad.AnnData,
@@ -35,12 +36,14 @@ def compute_gene_distance(
     elif metric == 'mahalanobis':
         adata.varp[metric] = mahalanobis_dis(adata.varm[adata.uns['dr_method']])
     elif metric == 'rho_p':
-        adata.varp[metric] = rho_p(pd.DataFrame(adata.raw.X, columns = adata.raw.var_names))
-    elif metric == 'rho_p':
-        adata.varp[metric] = phi_s(pd.DataFrame(adata.raw.X, columns = adata.raw.var_names))
+        adata.varp[metric] = 1 - rho_p(pd.DataFrame(adata.raw.X, columns=adata.raw.var_names))
+    elif metric == 'phi_s':
+        adata.varp[metric] = 1 - phi_s(pd.DataFrame(adata.raw.X, columns=adata.raw.var_names))
     else:
         raise NotImplementedError(f"Metric {metric} has not been implemented!")
     adata.uns['distance'] = metric
+    print(f"distances between genes have been computed using {metric}.")
+
 
 def bayes_corr(data: pd.DataFrame) -> pd.DataFrame:
     """
@@ -100,6 +103,7 @@ def mahalanobis_dis(data: pd.DataFrame):
     dist = pd.DataFrame(squareform(pdist(data, 'mahalanobis')), columns=data.index, index=data.index)
     return dist
 
+
 def rho_p(data: pd.DataFrame):
     """
     similarity measure using rho_p
@@ -107,12 +111,13 @@ def rho_p(data: pd.DataFrame):
     Citation:
     * https://github.com/tpq/propr
     * https://www.nature.com/articles/s41592-019-0372-4
-    """  
-    #replace zero values with non-zero smallest value
+    """
+    # replace zero values with non-zero smallest value
     # data[data == 0] = min(data[data != 0].min()) 
-    #replace zero values with 1
-    data[data == 0] = min(data[data != 0].min()) 
+    # replace zero values with 1
+    data[data == 0] = min(data[data != 0].min())
     return comp.pairwise_rho(data)
+
 
 def phi_s(data: pd.DataFrame):
     """
@@ -121,6 +126,6 @@ def phi_s(data: pd.DataFrame):
     Citation:
     * https://github.com/tpq/propr
     * https://www.nature.com/articles/s41592-019-0372-4
-    """     
-    data[data == 0] = min(data[data != 0].min()) 
+    """
+    data[data == 0] = min(data[data != 0].min())
     return comp.pairwise_phi(data)

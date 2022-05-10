@@ -1,17 +1,13 @@
+import numpy as np
 import scanpy as sc
-from GeneClust import select
+import numba
+from GeneClust import select, load_example_adata
+from sigclust import SigClust
 
-test_adata = sc.datasets.pbmc3k()
-sc.pp.filter_cells(test_adata, min_genes=10)
-sc.pp.filter_genes(test_adata, min_cells=10)
-test_adata.X = test_adata.X.toarray()
-test_adata.raw = test_adata
-sc.pp.normalize_total(test_adata)
-sc.pp.log1p(test_adata)
-test_adata.uns['data_name'] = 'pbmc3k'
 
-selected = select(test_adata, n_selected_genes=500, dr_method='pca-umap', n_comps=50, distance='bayesian',
-                  clustering='gmm', n_clusters=200, in_cluster_score='center', inter_cluster_score='top3',
-                  return_genes=True)
-print(selected)
+test_adata = load_example_adata()
+# selected = select(test_adata, n_selected_genes=500, dr_method='pca', n_comps=50, distance='rho_p',
+#                   clustering='ms', in_cluster_score='center', inter_cluster_score='silhouette',
+#                   return_genes=True)
 
+# print(test_adata)

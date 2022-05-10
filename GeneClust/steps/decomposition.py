@@ -10,7 +10,9 @@
 """
 import os
 from typing import Literal
-
+from sklearn.decomposition import TruncatedSVD
+import torch
+from torchnmf.nmf import NMF
 import anndata as ad
 import pandas as pd
 import scanpy as sc
@@ -28,17 +30,28 @@ def reduce_dimension(
         return cache
     else:
         if dr_method == 'pca':
-            embedding = sc.tl.pca(adata.X.T, n_comps=n_components)  # compute PCs on normalized data
+            gene_embedding = sc.tl.pca(adata.X.T, n_comps=n_components)  # compute PCs on normalized data
+        elif dr_method == 'svd':
+            model = TruncatedSVD(n_components=n_components, random_state=2022)
+            cell_embedding = model.fit_transform(adata.X)
+            gene_embedding = model.components_.T
+        elif dr_method == 'nmf':
+            model = NMF(adata.layers['normalized'].shape, rank=n_components).cuda()
+            model.fit(torch.from_numpy(adata.layers['normalized']).cuda())
+            gene_embedding, cell_embedding = model.W.cpu().detach().numpy(), model.H.cpu().detach().numpy()
         elif dr_method == 'umap':
-            embedding = umap.UMAP(n_components=n_components).fit_transform(adata.X.T)
+            gene_embedding = umap.UMAP(n_components=n_components).fit_transform(adata.X.T)
         elif dr_method == 'pca-umap':
             pca_emb = sc.tl.pca(adata.X.T, n_comps=n_components * 2)  # (n_features, n_components)
-            embedding = umap.UMAP(n_components=n_components).fit_transform(pca_emb)
+            gene_embedding = umap.UMAP(n_components=n_components).fit_transform(pca_emb)
         else:
             raise NotImplementedError(f"{dr_method} has not been implemented!")
 
-        adata.varm[dr_method] = pd.DataFrame(embedding, index=adata.var_names)  # shape: (n_genes, n_comps)
+        adata.varm[dr_method] = pd.DataFrame(gene_embedding, index=adata.var_names)  # shape: (n_genes, n_comps)
         adata.varm[dr_method].columns = adata.varm[dr_method].columns.astype(str)
+        if 'cell_embedding' in locals().keys():
+            adata.obsm[dr_method] = pd.DataFrame(cell_embedding, index=adata.obs_names)
+            adata.obsm[dr_method].columns = adata.obsm[dr_method].columns.astype(str)
         save_cache(adata)
         adata.uns['dr_method'] = dr_method
         return adata
