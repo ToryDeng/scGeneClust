@@ -34,7 +34,7 @@ def find_confident_cells(expr: np.ndarray,
         gmm_is_confident = max_proba > 0.95
         cluster_label = cell_proba.argmax(1)
         confident_cluster_label = cluster_label[gmm_is_confident]  #cluster label of confident cells
-        gmm_conf_expr = pd.DataFrame(expr)[gmm_is_confident]                     #expr of confident cells after gmm
+        gmm_conf_expr = pd.DataFrame(expr)[gmm_is_confident]       #expr of confident cells after gmm
 
         #find mnn in each cluster
         is_confident = pd.DataFrame(columns=['is_conf'], index=pd.DataFrame(expr).index)
