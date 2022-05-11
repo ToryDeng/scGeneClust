@@ -3,30 +3,28 @@
 # @Author : Tory Deng
 # @File : score.py
 # @Software: PyCharm
+import os
+from multiprocessing import Pool, cpu_count
+from typing import Literal
+
 import anndata as ad
 import numpy as np
 import pandas as pd
-from typing import Literal
-from sklearn.feature_selection import f_classif
 from scipy.stats import kruskal
-from multiprocessing import Pool
+from sklearn.feature_selection import f_classif
 
 
 def compute_gene_score(adata: ad.AnnData, score: Literal['f_stat', 'kw_stat']):
     if score == 'f_stat':
         adata.var[score], _ = f_classif(adata.layers['log-normalized'], adata.obs['cluster'])
     elif score == 'kw_stat':
-        grp_idxs = [np.argwhere(adata.obs['cluster'].values == grp) for grp in adata.obs['cluster'].unique()]
-        with Pool(processes=8) as pool:
-            adata.var[score] = pool.starmap(kruskal_wallis_test, [(adata.X[:, i], grp_idxs) for i in range(adata.n_vars)])
+        cell_cluster_exprs = [adata.X[adata.obs['cluster'].values == grp, :] for grp in adata.obs['cluster'].unique()]
+        with Pool(processes=cpu_count() - 1) as pool:
+            result = pool.starmap(kruskal, [[expr[:, i] for expr in cell_cluster_exprs] for i in range(adata.n_vars)])
+            adata.var[score] = [res[0] for res in result]  # stat, pval
     else:
         raise NotImplementedError(f"{score} has not been implemented!")
     adata.uns['gene_score'] = score
-
-
-def kruskal_wallis_test(gene_expr: np.ndarray, group_indexes: np.ndarray):
-    statistic, pval = kruskal(*[gene_expr[grp_idx].squeeze() for grp_idx in group_indexes])
-    return statistic
 
 
 def compute_gene_cluster_score(adata: ad.AnnData, top_n: int, score: Literal['top_mean']):

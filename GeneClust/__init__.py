@@ -5,5 +5,6 @@
 # @Software: PyCharm
 
 from .functions import select
-from gestect.functions import gestect
+import gestect.steps as gestect_steps
+from gestect.functions import gestect, two_way_clustering
 from .utils import load_example_adata

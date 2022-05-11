@@ -3,9 +3,10 @@
 # @Author : Tory Deng
 # @File : decomposition.py
 # @Software: PyCharm
-import torch
-import anndata as ad
 from typing import Literal, Optional
+
+import anndata as ad
+import torch
 from sklearn.decomposition import TruncatedSVD
 from torchnmf.nmf import NMF
 

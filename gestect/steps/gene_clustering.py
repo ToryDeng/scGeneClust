@@ -3,12 +3,13 @@
 # @Author : Tory Deng
 # @File : gene_clustering.py
 # @Software: PyCharm
-import numpy as np
 from queue import Queue
-from sklearn.cluster import MeanShift
-from sklearn.mixture import GaussianMixture
+
+import numpy as np
 from scipy.cluster.hierarchy import linkage, cophenet, fcluster
 from scipy.spatial.distance import pdist
+from sklearn.cluster import MeanShift
+from sklearn.mixture import GaussianMixture
 
 
 def cluster_genes(expr: np.ndarray,
@@ -25,7 +26,7 @@ def cluster_genes(expr: np.ndarray,
         print("coph: ", c)
         cluster_labels = fcluster(hierarchy, n_gene_clusters, criterion='maxclust')
     elif method == 'gmm':
-        gmm = GaussianMixture(n_components=n_gene_clusters)
+        gmm = GaussianMixture(n_components=n_gene_clusters, random_state=2022)
         cluster_labels = gmm.fit_predict(expr)
     else:
         raise NotImplementedError(f"'{method}' has not been implemented yet!")
