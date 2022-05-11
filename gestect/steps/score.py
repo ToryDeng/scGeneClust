@@ -8,14 +8,25 @@ import numpy as np
 import pandas as pd
 from typing import Literal
 from sklearn.feature_selection import f_classif
+from scipy.stats import kruskal
+from multiprocessing import Pool
 
 
-def compute_gene_score(adata: ad.AnnData, score: Literal['f_stat']):
+def compute_gene_score(adata: ad.AnnData, score: Literal['f_stat', 'kw_stat']):
     if score == 'f_stat':
-        adata.var['f_stat'], _ = f_classif(adata.layers['log-normalized'], adata.obs['cluster'])
+        adata.var[score], _ = f_classif(adata.layers['log-normalized'], adata.obs['cluster'])
+    elif score == 'kw_stat':
+        grp_idxs = [np.argwhere(adata.obs['cluster'].values == grp) for grp in adata.obs['cluster'].unique()]
+        with Pool(processes=8) as pool:
+            adata.var[score] = pool.starmap(kruskal_wallis_test, [(adata.X[:, i], grp_idxs) for i in range(adata.n_vars)])
     else:
         raise NotImplementedError(f"{score} has not been implemented!")
     adata.uns['gene_score'] = score
+
+
+def kruskal_wallis_test(gene_expr: np.ndarray, group_indexes: np.ndarray):
+    statistic, pval = kruskal(*[gene_expr[grp_idx].squeeze() for grp_idx in group_indexes])
+    return statistic
 
 
 def compute_gene_cluster_score(adata: ad.AnnData, top_n: int, score: Literal['top_mean']):

@@ -47,7 +47,7 @@ def gestect(adata:ad.AnnData,
             n_cell_clusters: int = 2,
             gene_clustering: Literal['ms', 'agg', 'gmm'] = 'gmm',
             n_gene_clusters: int = 300,
-            gene_score: Literal['f_stat'] = 'f_stat',
+            gene_score: Literal['f_stat', 'kw_stat'] = 'kw_stat',
             top_n_genes: int = 1,
             gene_cluster_score: Literal['top_mean'] = 'top_mean',
             return_genes: bool = False

@@ -3,3 +3,5 @@
 # @Author : Tory Deng
 # @File : __init__.py.py
 # @Software: PyCharm
+
+from .functions import gestect

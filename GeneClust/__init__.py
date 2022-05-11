@@ -5,4 +5,5 @@
 # @Software: PyCharm
 
 from .functions import select
+from gestect.functions import gestect
 from .utils import load_example_adata
