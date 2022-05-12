@@ -33,27 +33,28 @@ def find_confident_cells(expr: np.ndarray,
         cluster_label = cell_proba.argmax(1)
     elif how == 'mnn_proba':
         # find confident cells using gmm
-        gmm = GaussianMixture(n_components=n_cell_clusters, random_state=2022)
+        gmm = GaussianMixture(n_components=n_cell_clusters, random_state=42)
         gmm.fit(expr)
         cell_proba = gmm.predict_proba(expr)
         max_proba = cell_proba.max(1)
         gmm_is_confident = max_proba > 0.95
         cluster_label = cell_proba.argmax(1)
         confident_cluster_label = cluster_label[gmm_is_confident]  # cluster label of confident cells
-        gmm_conf_expr = pd.DataFrame(expr)[gmm_is_confident]  # expr of confident cells after gmm
+        gmm_conf_expr = pd.DataFrame(expr[gmm_is_confident])  # expr of confident cells after gmm
 
         # find mnn in each cluster
+        neighbor_k = 10
         is_confident = np.array([False] * len(expr))
-        for i in np.unique(cluster_label):  # for each cluster
-            cluster_i = confident_cluster_label == i
-            nbrs = NearestNeighbors(n_neighbors=k_neignbors).fit(gmm_conf_expr[cluster_i])
-            indices = nbrs.kneighbors(gmm_conf_expr, return_distance=False)
-            for j in range(len(indices)):
-                for neighbor in indices[j]:  # find all neighbor of cell j
-                    if j in indices[neighbor]:  # if cell j is also the neighbor of its neighbor
-                        is_confident[list(gmm_conf_expr[cluster_i].index)[j]] = True
-                        is_confident[list(gmm_conf_expr[cluster_i].index)[neighbor]] = True
-        is_confident = np.array(is_confident['is_conf'])
+        for i in np.unique(cluster_label):
+            if pd.value_counts(cluster_label)[i] >= neighbor_k:
+                cluster_i = confident_cluster_label == i
+                nbrs = NearestNeighbors(n_neighbors=neighbor_k).fit(gmm_conf_expr[cluster_i])
+                indices = nbrs.kneighbors(gmm_conf_expr, return_distance=False)
+                for j in range(len(indices)):
+                    for neighbor in indices[j]:  # find all neighbors of cell j
+                        if j in indices[neighbor]:  # if cell j is also the neighbor of its neighbor
+                            is_confident[list(gmm_conf_expr[cluster_i].index)[j]] = True
+                            is_confident[list(gmm_conf_expr[cluster_i].index)[neighbor]] = True
     elif how == 'mnn_graph':
         cluster_label, is_confident = mnn_graph_clustering(expr, k_neignbors)
     else:
