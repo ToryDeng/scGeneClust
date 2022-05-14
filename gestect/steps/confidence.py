@@ -12,6 +12,7 @@ import leidenalg
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import squareform
+from sklearn.metrics import pairwise_distances
 from sklearn.metrics.pairwise import pairwise_kernels
 from sklearn.mixture import GaussianMixture
 from sklearn.neighbors import NearestNeighbors
@@ -33,7 +34,7 @@ def find_confident_cells(expr: np.ndarray,
         cluster_label = cell_proba.argmax(1)
     elif how == 'mnn_proba':
         # find confident cells using gmm
-        gmm = GaussianMixture(n_components=n_cell_clusters, random_state=42)
+        gmm = GaussianMixture(n_components=n_cell_clusters, random_state=2022)
         gmm.fit(expr)
         cell_proba = gmm.predict_proba(expr)
         max_proba = cell_proba.max(1)
@@ -65,10 +66,14 @@ def find_confident_cells(expr: np.ndarray,
 def mnn_graph_clustering(cell_embeddings: np.ndarray,
                          k_neighbors: int = 30):
     # TODO: convert similarity matrix to distance matrix
-    simi_mtx = pairwise_kernels(cell_embeddings, metric='rbf')  # cell similarity matrix
+    simi_mtx = pd.DataFrame(data=cell_embeddings.T).corr(method='spearman').values
+    ident = np.ones(shape=(simi_mtx.shape[0], 1))
+    diag = np.expand_dims(np.diag(simi_mtx), axis=1)
+    dis_mtx = np.matmul(ident, diag.T) + np.matmul(diag, ident.T) - 2 * simi_mtx
+    # simi_mtx = pairwise_kernels(cell_embeddings, metric='rbf', n_jobs=-1)  # cell similarity matrix
     # create mnn graph
     neigh = NearestNeighbors(n_neighbors=k_neighbors, metric='precomputed', n_jobs=-1)
-    neigh.fit(simi_mtx)
+    neigh.fit(dis_mtx)  # convert similarity matrix to distance matrix
     knn_graph = neigh.kneighbors_graph()
     mnn_dense_graph = [1 if knn_graph[i, j] == 1 and knn_graph[j, i] == 1 else 0
                        for i in range(cell_embeddings.shape[0] - 1) for j in range(i + 1, cell_embeddings.shape[0])]

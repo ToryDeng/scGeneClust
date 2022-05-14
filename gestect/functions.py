@@ -60,16 +60,17 @@ def gestect(adata:ad.AnnData,
             use_rep: Optional[str] = None,
             dr_method: Literal['svd', 'nmf'] = 'svd',
             n_components: int = 50,
-            confidence: Literal['single_proba', 'mnn_proba', 'mnn_graph'] = 'single_proba',
+            confidence: Literal['single_proba', 'mnn_proba', 'mnn_graph'] = 'mnn_proba',
             k_neignbors: int = 30,
             n_cell_clusters: int = 2,
             gene_clustering: Literal['ms', 'agg', 'gmm'] = 'gmm',
             n_gene_clusters: int = 300,
-            gene_score: Literal['f_stat', 'kw_stat'] = 'kw_stat',
+            gene_score: Literal['f_stat', 'kw_stat'] = 'f_stat',
             top_n_genes: int = 1,
             gene_cluster_score: Literal['top_mean'] = 'top_mean',
             return_genes: bool = False
             ):
+    np.random.seed(2022)
     steps.two_way_embedding(adata, use_rep, dr_method, n_components)
     adata = two_way_clustering(adata, n_cell_clusters, gene_clustering, n_gene_clusters, confidence, k_neignbors)
     steps.compute_gene_score(adata, gene_score)
