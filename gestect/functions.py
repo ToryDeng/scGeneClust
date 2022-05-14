@@ -72,11 +72,11 @@ def gestect(adata:ad.AnnData,
             ):
     np.random.seed(2022)
     steps.two_way_embedding(adata, use_rep, dr_method, n_components)
-    adata = two_way_clustering(adata, n_cell_clusters, gene_clustering, n_gene_clusters, confidence, k_neignbors)
-    steps.compute_gene_score(adata, gene_score)
-    steps.compute_gene_cluster_score(adata, top_n_genes, gene_cluster_score)
+    hign_conf_adata = two_way_clustering(adata, n_cell_clusters, gene_clustering, n_gene_clusters, confidence, k_neignbors)
+    steps.compute_gene_score(hign_conf_adata, gene_score)
+    steps.compute_gene_cluster_score(hign_conf_adata, top_n_genes, gene_cluster_score)
     adata.var.to_csv(f"cache/{adata.uns['data_name']}_var.csv")
-    selected_genes = iteratively_select(adata, n_selected_genes, 'cluster', 'significant', 'gene_score')
+    selected_genes = iteratively_select(hign_conf_adata, n_selected_genes, 'cluster', 'significant', 'gene_score')
     # only preserve selected genes in adata
     filtered_adata = subset_adata(adata, selected_genes, inplace=False)
     return filtered_adata.var_names.to_frame(index=False, name='Gene') if return_genes else filtered_adata
