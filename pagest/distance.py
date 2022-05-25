@@ -16,6 +16,15 @@ def compute_pairwise_distances(
         n_jobs: Optional[int] = None,
         **kwargs
 ):
+    """
+    Compute pairwise distances between cells or genes.
+
+    :param X: The feature array, where rows represent cells (genes), and columns represent components
+    :param metric: The distance metric
+    :param n_jobs: The number of jobs to use for the computation
+    :param kwargs: Other keyword arguments
+    :return:
+    """
     if metric in _VALID_METRICS:
         return pairwise_distances(X=X, metric=metric, n_jobs=n_jobs, **kwargs)
     else:
