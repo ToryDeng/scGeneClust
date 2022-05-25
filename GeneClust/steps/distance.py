@@ -12,6 +12,7 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import pdist, squareform
+from sklearn.metrics import pairwise_distances
 from sklearn.feature_selection import mutual_info_regression
 import compositional as comp
 
@@ -36,9 +37,9 @@ def compute_gene_distance(
     elif metric == 'mahalanobis':
         adata.varp[metric] = mahalanobis_dis(adata.varm[adata.uns['dr_method']])
     elif metric == 'rho_p':
-        adata.varp[metric] = 1 - rho_p(pd.DataFrame(adata.raw.X, columns=adata.raw.var_names))
+        adata.varp[metric] = rho_p(adata)
     elif metric == 'phi_s':
-        adata.varp[metric] = 1 - phi_s(pd.DataFrame(adata.raw.X, columns=adata.raw.var_names))
+        adata.varp[metric] = phi_s(adata)
     else:
         raise NotImplementedError(f"Metric {metric} has not been implemented!")
     adata.uns['distance'] = metric
@@ -104,28 +105,34 @@ def mahalanobis_dis(data: pd.DataFrame):
     return dist
 
 
-def rho_p(data: pd.DataFrame):
+def rho_p(adata: ad.AnnData):
     """
     similarity measure using rho_p
     :param data: rows: genes
     Citation:
     * https://github.com/tpq/propr
     * https://www.nature.com/articles/s41592-019-0372-4
+    equation: rho_p = 2cov(logx, logy)/(var(logx)+var(logy))
     """
-    # replace zero values with non-zero smallest value
-    # data[data == 0] = min(data[data != 0].min()) 
-    # replace zero values with 1
-    data[data == 0] = min(data[data != 0].min())
-    return comp.pairwise_rho(data)
+    data = adata.raw.X + 1/(adata.raw.X.shape[1]**2)
+    propr_matrix = pairwise_distances(data.T, metric=lambda u, v: 2*np.cov(np.log(u),np.log(v), ddof=0)[0][1]/(np.var(np.log(u)) + np.var(np.log(v))), n_jobs=-1)
+    return pd.DataFrame(propr_matrix, columns=adata.raw.var_names, index=adata.raw.var_names)
 
 
-def phi_s(data: pd.DataFrame):
+def phi_s(adata: ad.AnnData):
     """
     similarity measure using phi_s
     :param data: rows: genes
     Citation:
     * https://github.com/tpq/propr
     * https://www.nature.com/articles/s41592-019-0372-4
+    equation: phi_s(log(x), log(y)) = var(log(x/y)) /  var(log(x))
     """
-    data[data == 0] = min(data[data != 0].min())
-    return comp.pairwise_phi(data)
+    data = adata.raw.X + 1/adata.raw.X.shape[1]**2
+    propr_matrix = pairwise_distances(data.T, metric=lambda u, v: np.var(np.log(u) - np.log(v)) / np.var(np.log(u)), n_jobs=-1)
+    return pd.DataFrame(propr_matrix, columns=adata.raw.var_names, index=adata.raw.var_names)
+
+#example
+data = np.array([[1,2,3], [4,1,7], [9,10,3], [6,3,2]])
+propr_matrix_rho = pairwise_distances(data.T, metric=lambda u, v: 2*np.cov(np.log(u),np.log(v), ddof=0)[0][1]/(np.var(np.log(u)) + np.var(np.log(v))), n_jobs=-1)
+propr_matrix_phi = pairwise_distances(data.T, metric=lambda u, v: np.var(np.log(u) - np.log(v)) / np.var(np.log(u)))
