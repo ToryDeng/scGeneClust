@@ -115,8 +115,13 @@ def rho_p(adata: ad.AnnData):
     equation: rho_p = 2cov(logx, logy)/(var(logx)+var(logy))
     """
     data = adata.raw.X + 1/(adata.raw.X.shape[1]**2)
-    propr_matrix = pairwise_distances(data.T, metric=lambda u, v: 2*np.cov(np.log(u),np.log(v), ddof=0)[0][1]/(np.var(np.log(u)) + np.var(np.log(v))), n_jobs=-1)
-    return pd.DataFrame(propr_matrix, columns=adata.raw.var_names, index=adata.raw.var_names)
+    # propr_matrix = pairwise_distances(data.T, metric=lambda u, v: 2*np.cov(np.log(u),np.log(v), ddof=0)[0][1]/(np.var(np.log(u)) + np.var(np.log(v))), n_jobs=-1)
+    # return pd.DataFrame(propr_matrix, columns=adata.raw.var_names, index=adata.raw.var_names)
+    var_log = np.var(np.log(data), axis=0)
+    var_mtx = [var_log[i]+var_log[j] for i in range(data.shape[1] - 1) for j in range(i + 1, (data.shape[1]))]
+    var_mtx = squareform(var_mtx) + np.diag(2*var_log)
+
+    return pd.DataFrame(2*np.cov(np.log(data.T), ddof=0) / var_mtx, columns=adata.raw.var_names, index=adata.raw.var_names)
 
 
 def phi_s(adata: ad.AnnData):
@@ -129,5 +134,16 @@ def phi_s(adata: ad.AnnData):
     equation: phi_s(log(x), log(y)) = var(log(x/y)) /  var(log(x))
     """
     data = adata.raw.X + 1/adata.raw.X.shape[1]**2
-    propr_matrix = pairwise_distances(data.T, metric=lambda u, v: np.var(np.log(u) - np.log(v)) / np.var(np.log(u)), n_jobs=-1)
-    return pd.DataFrame(propr_matrix, columns=adata.raw.var_names, index=adata.raw.var_names)
+    var_log = np.var(np.log(data), axis=0)
+    phi_s = [np.var(np.log(data[:,i])-np.log(data[:,j])) / var_log[i] for i in range(data.shape[1]) for j in range(data.shape[1])]
+    phi_s = np.array(phi_s).reshape(data.shape[1], data.shape[1]) 
+    return pd.DataFrame(phi_s, columns=adata.raw.var_names, index=adata.raw.var_names)
+    # propr_matrix = pairwise_distances(data.T, metric=lambda u, v: np.var(np.log(u) - np.log(v)) / np.var(np.log(u)), n_jobs=-1)
+    # return pd.DataFrame(propr_matrix, columns=adata.raw.var_names, index=adata.raw.var_names)
+
+
+
+
+
+
+
