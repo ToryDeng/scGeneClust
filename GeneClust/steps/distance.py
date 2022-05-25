@@ -131,8 +131,3 @@ def phi_s(adata: ad.AnnData):
     data = adata.raw.X + 1/adata.raw.X.shape[1]**2
     propr_matrix = pairwise_distances(data.T, metric=lambda u, v: np.var(np.log(u) - np.log(v)) / np.var(np.log(u)), n_jobs=-1)
     return pd.DataFrame(propr_matrix, columns=adata.raw.var_names, index=adata.raw.var_names)
-
-#example
-data = np.array([[1,2,3], [4,1,7], [9,10,3], [6,3,2]])
-propr_matrix_rho = pairwise_distances(data.T, metric=lambda u, v: 2*np.cov(np.log(u),np.log(v), ddof=0)[0][1]/(np.var(np.log(u)) + np.var(np.log(v))), n_jobs=-1)
-propr_matrix_phi = pairwise_distances(data.T, metric=lambda u, v: np.var(np.log(u) - np.log(v)) / np.var(np.log(u)))
