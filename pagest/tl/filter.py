@@ -19,6 +19,7 @@ def filter_adata(adata: ad.AnnData, mode: Literal['one-way', 'two-way'], quantil
     :param quantile: The quantile of number of gene clusters to compute
     :return: The copied and filtered AnnData object
     """
+    print(adata.var.loc[:, ('cluster', 'cluster_score')].drop_duplicates())
     cluster_score = adata.var.loc[:, ('cluster', 'cluster_score')].drop_duplicates()['cluster_score']
     bound = cluster_score.quantile(q=quantile)
     keep_genes = adata.var['cluster_score'] > bound

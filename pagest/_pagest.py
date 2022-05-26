@@ -47,7 +47,7 @@ def select_from_clusters(adata: ad.AnnData, mode: Literal['one-way', 'two-way'],
                 selected_genes = np.hstack([remained_genes, selected_genes])
                 break
             else:
-                randomly_chosen_genes = np.random.choice(remained_genes, size=n_remained_genes)
+                randomly_chosen_genes = np.random.choice(remained_genes, size=n_remained_genes, replace=False)
                 selected_genes = np.hstack([randomly_chosen_genes, selected_genes])
                 break
     return selected_genes
@@ -61,9 +61,9 @@ def pagest(
         n_components: int = 50,
         gene_clustering: Literal['gmm', 'leiden'] = 'leiden',
         n_gene_clusters: Optional[int] = None,
-        gene_distance: Union[str, Callable] = 'euclidean',
+        gene_distance: Union[str, Callable] = None,
         n_gene_neighbors: Optional[int] = 15,
-        cell_distance: Union[str, Callable] = 'euclidean',
+        cell_distance: Union[str, Callable] = None,
         n_cell_neighbors: Optional[int] = 15,
         gene_cluster_score: Literal['silhouette', 'spearman'] = 'spearman',
         drop_quantile: float = 0.1,
@@ -109,11 +109,13 @@ def pagest(
     if mode == 'two-way':
         tl.score_discriminative_gene(filtered_adata, stat)
         adata.var['stat'] = filtered_adata.var['stat']
+    filtered_adata.write(f"filtered.h5ad")
     selected_genes = select_from_clusters(filtered_adata, mode, n_features)
 
     is_informative = np.isin(adata.var_names, selected_genes)
     if is_informative.sum() != n_features:
-        raise RuntimeError(f"Only found {is_informative.sum()} informative genes in adata.var_names, not {n_features}.")
+        raise RuntimeError(f"Only found {is_informative.sum()} informative genes in adata.var_names, not {n_features}. "
+                           f"Not used gene(s): {np.isin(selected_genes, adata.var_names).sum()}")
 
     if subset:
         adata._inplace_subset_var(is_informative)
