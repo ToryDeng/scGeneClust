@@ -6,9 +6,11 @@
 from typing import Literal, Optional, Union, Callable
 
 import anndata as ad
+import scanpy as sc
 import numpy as np
 
 import pagest.tl as tl
+import pagest.pp as pp
 from pagest.utils import set_logger
 
 
@@ -57,14 +59,12 @@ def pagest(
         adata: ad.AnnData,
         n_features: int,
         mode: Literal['one-way', 'two-way'],
-        use_rep: Optional[str] = 'log-normalized',
         n_components: int = 50,
         gene_clustering: Literal['gmm', 'leiden'] = 'leiden',
         n_gene_clusters: Optional[int] = None,
         gene_distance: Union[str, Callable] = None,
-        n_gene_neighbors: Optional[int] = 15,
-        cell_distance: Union[str, Callable] = None,
-        n_cell_neighbors: Optional[int] = 15,
+        n_gene_neighbors: Optional[int] = 30,
+        n_cell_clusters: Optional[int] = None,
         gene_cluster_score: Literal['silhouette', 'spearman'] = 'spearman',
         drop_quantile: float = 0.1,
         stat: Literal['kw', 'f'] = 'kw',
@@ -73,21 +73,19 @@ def pagest(
         random_stat: Optional[int] = None
 ) -> Optional[np.ndarray]:
     """
-    Pattern-aware Gene Selection (PAGEST). If `mode`='one-way', it will only find patterns in genes and preserve the
-    most representative genes to reduce the redundancy in genes. If `mode`='two-way', it will simultaneously find patterns
+    Pattern-aware Gene Selection (PAGEST). If `mode='one-way'`, it will only find patterns in genes and preserve the
+    most representative genes to reduce the redundancy in genes. If `mode='two-way'`, it will simultaneously find patterns
     in cells and genes, and select genes that are not only pattern-specific but also discriminative.
 
     :param adata: The AnnData object
     :param n_features: The number of features to be selected
     :param mode: `one-way` only considers patterns in genes; `two-way` considers patterns both in cells and genes
-    :param use_rep: Use `.X` if None (default) otherwise use the corresponding layer.
     :param n_components: The number of used principle components
     :param gene_clustering: The gene clustering method
     :param n_gene_clusters: The number of gene clusters. Will be automatically determined if None.
     :param gene_distance: The metric used to measure the distances between genes
     :param n_gene_neighbors: The number of gene neighbors. Only used in leiden clustering.
-    :param cell_distance: The metric used to measure the distances between cells
-    :param n_cell_neighbors: The number of cell neighbors
+    :param n_cell_clusters: The number of cell clusters
     :param gene_cluster_score: 'silhouette': mean silhouette scores; 'spearman': mean absolute spearman correlation
     :param drop_quantile: The quantile of number of gene clusters to compute
     :param stat: The kind of statistic used to represent differences of gene expression between cell groups
@@ -99,19 +97,16 @@ def pagest(
     np.random.seed(random_stat)
     set_logger(verbose)
 
-    tl.reduce_dimension(adata, mode, use_rep, n_components, random_stat)
-    tl.do_clustering(adata, mode, gene_clustering, n_gene_clusters, gene_distance, n_gene_neighbors,
-                     cell_distance, n_cell_neighbors, random_stat)
-    tl.score_gene_cluster(adata, gene_cluster_score)
-
-    filtered_adata = tl.filter_adata(adata, mode, drop_quantile)
+    pp.preprocess(adata)
+    pp.reduce_dimension(adata, mode, n_components, random_stat)
+    tl.do_clustering(adata, mode, gene_clustering, n_gene_clusters, gene_distance, n_gene_neighbors, n_cell_clusters, random_stat)
+    # tl.score_gene_cluster(adata, gene_cluster_score)
+    filtered_adata = tl.filter_adata2(adata, mode, drop_quantile)
 
     if mode == 'two-way':
         tl.score_discriminative_gene(filtered_adata, stat)
         adata.var['stat'] = filtered_adata.var['stat']
-    filtered_adata.write(f"filtered.h5ad")
     selected_genes = select_from_clusters(filtered_adata, mode, n_features)
-
     is_informative = np.isin(adata.var_names, selected_genes)
     if is_informative.sum() != n_features:
         raise RuntimeError(f"Only found {is_informative.sum()} informative genes in adata.var_names, not {n_features}. "

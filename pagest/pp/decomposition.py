@@ -7,24 +7,23 @@ from typing import Literal, Optional
 
 import anndata as ad
 from loguru import logger
-from sklearn.decomposition import TruncatedSVD
+from sklearn.decomposition import PCA
 
 
 def reduce_dimension(
         adata: ad.AnnData,
         mode: Literal['one-way', 'two-way'],
-        layer: Optional[str] = None,
         n_comps: int = 50,
         random_stat: Optional[int] = None,
 ):
     logger.info("Start to reduce dimension...")
-    expression_matrix = adata.layers[layer] if layer is not None else adata.X
-    decomp_model = TruncatedSVD(n_components=n_comps, n_iter=10, random_state=random_stat)
-    decomp_model.fit(expression_matrix)
+    pca_gene = PCA(n_components=n_comps, whiten=True, svd_solver='arpack', random_state=random_stat)
+    adata.varm['pca'] = pca_gene.fit_transform(adata.layers['X_gene'].T)
     if mode == 'one-way':
-        adata.varm['svd'] = decomp_model.components_.T
+        pass
     elif mode == 'two-way':
-        adata.varm['svd'], adata.obsm['svd'] = decomp_model.components_.T, decomp_model.transform(expression_matrix)
+        pca_cell = PCA(n_components=n_comps, whiten=True, svd_solver='arpack', random_state=random_stat)
+        adata.obsm['pca'] = pca_cell.fit_transform(adata.layers['X_cell'])
     else:
         raise ValueError(f"Argument `mode` can only be 'one-way' or 'two-way', not '{mode}'.")
     logger.info("Dimension reduction finished!")

@@ -31,7 +31,7 @@ def test_do_clustering():
     assert not np.isinf(adata.var['centrality'].max())
     do_clustering(adata, 'one-way', gene_clustering_method='leiden', random_stat=42)
     assert not np.isinf(adata.var['centrality'].max())
-    assert 'distance' in adata.varp and 'knn' in adata.varp
+    assert 'distances' in adata.varp and 'connectivities' in adata.varp
     do_clustering(adata, 'two-way', gene_clustering_method='gmm', random_stat=42)
     assert 'cluster' in adata.obs and 'highly_confident' in adata.obs
 

@@ -16,10 +16,10 @@ def test_reduce_dimension():
     reduce_dimension(adata1, 'one-way', random_stat=42)
     reduce_dimension(adata2, 'two-way', random_stat=42)
 
-    assert 'svd' in adata1.varm and 'svd' not in adata1.obsm
-    assert 'svd' in adata2.varm and 'svd' in adata2.obsm
-    assert adata2.obsm['svd'].shape[0] == adata2.n_obs and adata2.varm['svd'].shape[0] == adata2.n_vars
-    assert np.all(adata1.varm['svd'] == adata2.varm['svd'])
+    assert 'pca' in adata1.varm and 'pca' not in adata1.obsm
+    assert 'pca' in adata2.varm and 'pca' in adata2.obsm
+    assert adata2.obsm['pca'].shape[0] == adata2.n_obs and adata2.varm['pca'].shape[0] == adata2.n_vars
+    assert np.all(adata1.varm['pca'] == adata2.varm['pca'])
 
 
 

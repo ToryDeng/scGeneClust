@@ -6,6 +6,5 @@
 
 
 from .cluster import do_clustering, cluster_genes, find_high_confidence_cells
-from .decomposition import reduce_dimension
-from .filter import filter_adata
+from .filter import filter_adata, filter_adata2
 from .score import score_gene_cluster, score_discriminative_gene

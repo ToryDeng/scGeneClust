@@ -27,15 +27,15 @@ def score_gene_cluster(adata: ad.AnnData, method: Literal['silhouette', 'spearma
     """
     logger.info(f"Start to score gene clusters using {method}...")
     if method == 'silhouette':
-        if 'distance' in adata.varp:
-            sample_scores = silhouette_samples(adata.varp['distance'], adata.var['cluster'], metric='precomputed')
+        if 'distances' in adata.varp:
+            sample_scores = silhouette_samples(adata.varp['distances'], adata.var['cluster'], metric='precomputed')
         else:
-            sample_scores = silhouette_samples(adata.varm['svd'], adata.var['cluster'], metric='euclidean')
+            sample_scores = silhouette_samples(adata.varm['pca'], adata.var['cluster'], metric='euclidean')
         for cluster in adata.var['cluster'].unique():
             cluster_mask = adata.var['cluster'] == cluster
             adata.var.loc[cluster_mask, 'cluster_score'] = sample_scores[cluster_mask].mean()
     elif method == 'spearman':
-        corr = spearmanr(adata.varm['svd'], axis=1)[0]
+        corr = spearmanr(adata.varm['pca'], axis=1)[0]
         for cluster in adata.var['cluster'].unique():
             cluster_mask = adata.var['cluster'] == cluster
             cluster_corr = corr[np.ix_(cluster_mask, cluster_mask)]
@@ -55,7 +55,7 @@ def score_discriminative_gene(adata: ad.AnnData, stat: Literal['kw', 'f'], use_r
     :param use_rep: If use_rep is None, the statistic is calculated on adata.X; Otherwise calculated on adata.layers[use_rep]
     :return: None
     """
-    X, y = adata.X if use_rep is None else adata.layers[use_rep], adata.obs['cluster']
+    X, y = adata.layers['X_cell'], adata.obs['cluster']
     if stat == 'f':
         adata.var['stat'], _ = f_classif(X, y)
     elif stat == 'kw':

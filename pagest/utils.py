@@ -37,7 +37,7 @@ def set_logger(verbose: Literal[0, 1, 2] = 1):
 
     def formatter(record: dict):
         if record['level'].name in ('DEBUG', 'INFO'):
-            return "<level>{level}</level> | " \
+            return "<level>{level: <5}</level> | " \
                    "<level>{message}\n</level>"
         else:
             return "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | " \
