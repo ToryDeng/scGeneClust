@@ -5,14 +5,16 @@
 # @Software: PyCharm
 import numpy as np
 
-from pagest.tl import reduce_dimension
+from pagest.pp import reduce_dimension, preprocess
 from pagest.utils import load_example_adata, set_logger
 
 
 def test_reduce_dimension():
     set_logger(verbose=0)
-    adata1 = load_example_adata()
+    adata1 = load_example_adata().raw.to_adata()
     adata2 = adata1.copy()
+    preprocess(adata1)
+    preprocess(adata2)
     reduce_dimension(adata1, 'one-way', random_stat=42)
     reduce_dimension(adata2, 'two-way', random_stat=42)
 

@@ -6,7 +6,7 @@
 from typing import Literal, Optional, Union, Callable
 
 import anndata as ad
-import scanpy as sc
+from numpy.random import default_rng
 import numpy as np
 
 import pagest.tl as tl
@@ -14,13 +14,19 @@ import pagest.pp as pp
 from pagest.utils import set_logger
 
 
-def select_from_clusters(adata: ad.AnnData, mode: Literal['one-way', 'two-way'], n_features: int):
+def select_from_clusters(
+        adata: ad.AnnData,
+        mode: Literal['one-way', 'two-way'],
+        n_features: int,
+        random_state: Optional[int]
+):
     """
     Select `n_features` genes from gene clusters.
 
     :param adata: The ann oblect. adata.var must contain 'cluster' and 'centrality' (or 'stat') columns and is indexed by genes
     :param mode: `one-way` only considers patterns in genes; `two-way` considers patterns both in cells and genes
     :param n_features: The number of features to be selected
+    :param random_state: Random seed for reproducibility
     :return: ndarray, selected features
     """
     gene_score = 'centrality' if mode == 'one-way' else 'stat'
@@ -49,7 +55,8 @@ def select_from_clusters(adata: ad.AnnData, mode: Literal['one-way', 'two-way'],
                 selected_genes = np.hstack([remained_genes, selected_genes])
                 break
             else:
-                randomly_chosen_genes = np.random.choice(remained_genes, size=n_remained_genes, replace=False)
+                rng = default_rng(random_state)
+                randomly_chosen_genes = rng.choice(remained_genes, size=n_remained_genes, replace=False)
                 selected_genes = np.hstack([randomly_chosen_genes, selected_genes])
                 break
     return selected_genes
@@ -94,7 +101,6 @@ def pagest(
     :param random_stat: The random seed. Default is none
     :return: (Optional) the selected genes if `subset` is False
     """
-    np.random.seed(random_stat)
     set_logger(verbose)
 
     pp.preprocess(adata)
@@ -106,7 +112,7 @@ def pagest(
     if mode == 'two-way':
         tl.score_discriminative_gene(filtered_adata, stat)
         adata.var['stat'] = filtered_adata.var['stat']
-    selected_genes = select_from_clusters(filtered_adata, mode, n_features)
+    selected_genes = select_from_clusters(filtered_adata, mode, n_features, random_stat)
     is_informative = np.isin(adata.var_names, selected_genes)
     if is_informative.sum() != n_features:
         raise RuntimeError(f"Only found {is_informative.sum()} informative genes in adata.var_names, not {n_features}. "

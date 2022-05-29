@@ -98,7 +98,7 @@ def cluster_genes(
     :return: None
     """
     logger.info(f"Start to cluster genes using {method} clustering...")
-
+    print(f"Gene Clustering random state: {random_stat}")
     if method == 'gmm':
         if n_gene_clusters is None:
             logger.info("You didn't specify the number of gene clusters. Automatically finding...")
@@ -236,11 +236,11 @@ def leiden(data: Union[ad.AnnData, np.ndarray],
     cluster_labels = np.array(partition.membership)
     if compute_centrality:
         logger.debug("Computing centrality...")
-        centralities = np.zeros_like(cluster_labels)
+        centralities = np.zeros_like(cluster_labels, dtype=float)
         for cluster in np.unique(cluster_labels):
             cluster_mask = cluster_labels == cluster
             G_sub = G.subgraph(np.argwhere(cluster_mask).squeeze())
-            centralities[cluster_mask] = G_sub.evcent()
+            centralities[cluster_mask] = G_sub.pagerank()
         return cluster_labels, centralities
     return cluster_labels
 

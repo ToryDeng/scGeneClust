@@ -17,7 +17,7 @@ def reduce_dimension(
         random_stat: Optional[int] = None,
 ):
     logger.info("Start to reduce dimension...")
-    pca_gene = PCA(n_components=n_comps, whiten=True, svd_solver='arpack', random_state=random_stat)
+    pca_gene = PCA(n_components=n_comps, whiten=True, random_state=random_stat)
     adata.varm['pca'] = pca_gene.fit_transform(adata.layers['X_gene'].T)
     if mode == 'one-way':
         pass
