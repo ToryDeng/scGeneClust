@@ -38,6 +38,7 @@ def filter_adata(adata: ad.AnnData, mode: Literal['one-way', 'two-way'], quantil
 
     return copied
 
+
 def filter_adata2(adata: ad.AnnData, mode: Literal['one-way', 'two-way'], quantile: float = 0.1) -> ad.AnnData:
     """
     Filter out low-quality gene clusters (and low-confidence cells if `mode`='two-way') on copied AnnData object.
@@ -47,12 +48,16 @@ def filter_adata2(adata: ad.AnnData, mode: Literal['one-way', 'two-way'], quanti
     :param quantile: The quantile of number of gene clusters to compute
     :return: The copied and filtered AnnData object
     """
+    gene_counts = adata.var['cluster'].value_counts(ascending=False)
+    keep_genes = np.isin(adata.var['cluster'], gene_counts[gene_counts > 1].index)
+    logger.debug(f"Removing {adata.n_vars - keep_genes.sum()} single gene clusters")
+
     if mode == 'two-way':
         keep_cells = adata.obs['highly_confident']
         logger.debug(f"Removing {adata.n_obs - keep_cells.sum()} low-confidence cells")
     else:
         keep_cells = np.ones(shape=(adata.n_obs,), dtype=bool)
-    copied = adata[keep_cells, :].copy()
+    copied = adata[keep_cells, keep_genes].copy()
     is_constant_genes = np.all(copied.X == copied.X[0, :], axis=0)
     logger.debug(f"Removing {is_constant_genes.sum()} constant genes...")
     copied = copied[:, ~is_constant_genes]

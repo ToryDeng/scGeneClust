@@ -11,3 +11,4 @@ from pagest.utils import load_example_adata
 def test_load_example_adata():
     adata = load_example_adata()
     assert isinstance(adata, ad.AnnData)
+    assert adata.raw is not None

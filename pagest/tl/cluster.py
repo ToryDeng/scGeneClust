@@ -24,7 +24,7 @@ from sklearn.neighbors import kneighbors_graph
 from sklearn.preprocessing import minmax_scale
 from sklearn.preprocessing import scale
 
-from ..distance import compute_pairwise_distances
+from pagest.tl.distance import compute_pairwise_distances
 
 
 def do_clustering(
@@ -70,6 +70,7 @@ def do_clustering(
 
     cluster_gene_counts = adata.var['cluster'].value_counts()
     logger.debug(f"Total number of gene clusters: {cluster_gene_counts.shape[0]}")
+    logger.debug(f"Total number of single gene clusters: {(cluster_gene_counts == 1).sum()}")
     logger.debug(f"Size of the top 5 largest gene clusters: \n{cluster_gene_counts.head(5)}")
     logger.debug(f"Size of the top 5 smallest gene clusters: \n{cluster_gene_counts.tail(5)}")
 
@@ -98,7 +99,6 @@ def cluster_genes(
     :return: None
     """
     logger.info(f"Start to cluster genes using {method} clustering...")
-    print(f"Gene Clustering random state: {random_stat}")
     if method == 'gmm':
         if n_gene_clusters is None:
             logger.info("You didn't specify the number of gene clusters. Automatically finding...")
@@ -112,9 +112,9 @@ def cluster_genes(
         _check_gene_clustering_params(adata, method, n_gene_clusters, gene_distance)
         find_neighbors(adata, 'gene', gene_distance, n_gene_neighbors)
         if mode == 'one-way':
-            adata.var['cluster'], adata.var['centrality'] = leiden(adata, 'gene', compute_centrality=True, seed=random_stat)
+            adata.var['cluster'], adata.var['centrality'] = leiden(adata, 'gene', resolution=5, compute_centrality=True, seed=random_stat)
         else:
-            adata.var['cluster'] = leiden(adata, 'gene', seed=random_stat)
+            adata.var['cluster'] = leiden(adata, 'gene', resolution=5, seed=random_stat)
     logger.info("Gene clustering finished!")
 
 
@@ -193,15 +193,15 @@ def find_neighbors(
     attr = 'obs' if on == 'cell' else 'var'
     attrp, attrm = attr + 'p', attr + 'm'
 
-    logger.debug(f"Compute {on} distances...")
-    getattr(adata, attrp)['distances'] = compute_pairwise_distances(
-        getattr(adata, attrm)['pca'], metric=dis_metric, n_jobs=-1
-    )
-
+    logger.debug(f"Compute {on} distances using {dis_metric}...")
+    getattr(adata, attrp)['distances'] = compute_pairwise_distances(adata, on=on, metric=dis_metric, n_jobs=-1)
     logger.debug(f"Finding KNNs on {on}...")
-    getattr(adata, attrp)['connectivities'] = kneighbors_graph(
+    knn_graph = kneighbors_graph(
         getattr(adata, attrp)['distances'], n_neighbors, metric='precomputed', n_jobs=-1
     ).toarray()
+    logger.debug(f"Finding MNNs on {on}...")
+    mnn_graph = np.logical_and(knn_graph, knn_graph.T).astype(int)
+    getattr(adata, attrp)['connectivities'] = mnn_graph
 
 
 def leiden(data: Union[ad.AnnData, np.ndarray],
@@ -301,5 +301,5 @@ def _compute_distance2center(adata: ad.AnnData, means_: np.ndarray) -> np.ndarra
     all_distances = paired_distances(adata.varm['pca'], means_[adata.var['cluster']])
     for gene_cluster in np.unique(adata.var['cluster']):
         gene_cluster_mask = adata.var['cluster'] == gene_cluster
-        all_distances[gene_cluster_mask] = minmax_scale(all_distances[gene_cluster_mask])
+        all_distances[gene_cluster_mask] = 1 - minmax_scale(all_distances[gene_cluster_mask])
     return all_distances
