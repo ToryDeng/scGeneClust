@@ -1,1 +1,1 @@
-# **PAGEST**: ***P***attern-***A***ware ***GE***ne ***S***elec***T***ion
+# **scGeneClust**: single-cell feature selection via gene clustering
