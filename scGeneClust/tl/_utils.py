@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # @Time : 2022/6/3 17:09
 # @Author : Tory Deng
-# @File : _utils.py
+# @File : utils.py
 # @Software: PyCharm
 import anndata as ad
 import numpy as np

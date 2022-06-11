@@ -11,7 +11,7 @@ from sklearn.cluster import MiniBatchKMeans
 
 import scGeneClust.pp as pp
 import scGeneClust.tl as tl
-from ._utils import _check_raw_counts, set_logger, select_from_clusters, prepare_GO
+from .utils import _check_raw_counts, set_logger, select_from_clusters, prepare_GO
 
 
 def scGeneClust(

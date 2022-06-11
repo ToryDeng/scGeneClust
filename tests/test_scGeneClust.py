@@ -4,7 +4,7 @@
 # @File : test_scGeneClust.py
 # @Software: PyCharm
 from scGeneClust import scGeneClust
-from scGeneClust._utils import load_example_adata
+from scGeneClust.utils import load_example_adata
 
 
 def test_scGeneClust():

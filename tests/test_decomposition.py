@@ -6,17 +6,17 @@
 import numpy as np
 
 from scGeneClust.pp import reduce_dimension, preprocess
-from scGeneClust._utils import load_example_adata, set_logger
+from scGeneClust.utils import load_example_adata, set_logger
 
 
 def test_reduce_dimension():
     set_logger(verbosity=0)
     adata1 = load_example_adata().raw.to_adata()
     adata2 = adata1.copy()
-    preprocess(adata1, 'two-way')
-    preprocess(adata2, 'two-way')
-    reduce_dimension(adata1, 'one-way', n_comps=50, random_stat=42)
-    reduce_dimension(adata2, 'two-way', n_comps=50, random_stat=42)
+    preprocess(adata1, 'fast')
+    preprocess(adata2, 'hc')
+    reduce_dimension(adata1, 'fast', n_comps=50, random_stat=42)
+    reduce_dimension(adata2, 'hc', n_comps=50, random_stat=42)
 
     assert 'pca' in adata1.varm and 'pca' not in adata1.obsm
     assert 'pca' in adata2.varm and 'pca' in adata2.obsm
