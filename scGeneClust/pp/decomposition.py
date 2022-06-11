@@ -12,14 +12,14 @@ from sklearn.decomposition import PCA
 
 def reduce_dimension(
         adata: ad.AnnData,
-        mode: Literal['one-way', 'two-way'],
+        mode: Literal['fast', 'hc'],
         n_comps: int,
         random_stat: Optional[int],
 ):
     logger.info("Start to reduce dimension...")
     pca_gene = PCA(n_components=n_comps, random_state=random_stat)
     adata.varm['pca'] = pca_gene.fit_transform(adata.layers['X_gene_scale'].T)
-    if mode == 'one-way':
+    if mode == 'fast':
         pass
     else:
         pca_cell = PCA(n_components=n_comps, random_state=random_stat)

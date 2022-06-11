@@ -4,6 +4,6 @@
 # @File : __init__.py.py
 # @Software: PyCharm
 
-from .cluster import do_clustering
-from .filtering import filter
-from .score import score_discriminative_gene
+from ._utils import compute_gene_closeness
+from .confidence import find_high_confidence_cells
+from .filtering import filter_adata

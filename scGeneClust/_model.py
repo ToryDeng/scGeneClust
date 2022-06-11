@@ -3,46 +3,62 @@
 # @Author : Tory Deng
 # @File : _model.py
 # @Software: PyCharm
+from typing import Literal, Optional
+
 import anndata as ad
 import numpy as np
+from sklearn.cluster import MiniBatchKMeans
+
 import scGeneClust.pp as pp
 import scGeneClust.tl as tl
-from typing import Literal, Optional
-from scGeneClust._utils import _check_raw_counts, _check_params, set_logger, select_from_clusters
+from ._utils import _check_raw_counts, set_logger, select_from_clusters, prepare_GO
 
 
 def scGeneClust(
-        adata: ad.AnnData,
-        mode: Literal['one-way', 'two-way'] = 'two-way',
+        raw_adata: ad.AnnData,
+        mode: Literal['fast', 'hc'] = 'fast',
         n_components: int = 50,
         n_gene_clusters: Optional[int] = None,
-        n_gene_neighbors: Optional[int] = None,
         n_cell_clusters: Optional[int] = None,
-        subset: bool = False,
         verbosity: Literal[0, 1, 2] = 1,
         random_stat: Optional[int] = None,
-        **kwargs
 ):
     set_logger(verbosity)
-    _check_raw_counts(adata)
-    n_gene_clusters, n_gene_neighbors, n_cell_clusters = \
-        _check_params(mode, n_components, n_gene_clusters, n_gene_neighbors, n_cell_clusters, verbosity)
+    _check_raw_counts(raw_adata)
 
-    pp.preprocess(adata, mode)
-    pp.reduce_dimension(adata, mode, n_components, random_stat)
+    copied = raw_adata.copy()
+    # preprocessing
+    pp.preprocess(copied, mode)
+    pp.reduce_dimension(copied, mode, n_components, random_stat)
 
-    tl.do_clustering(adata, mode, n_gene_clusters, n_gene_neighbors, n_cell_clusters, random_stat, **kwargs)
-    filtered_adata = tl.filter(adata, mode)
-    if mode == 'two-way':
-        tl.score_discriminative_gene(filtered_adata)
-        adata.var['score'] = filtered_adata.var['score']
-    selected_genes = select_from_clusters(filtered_adata, mode)
+    if mode == 'fast':
+        km = MiniBatchKMeans(n_clusters=n_gene_clusters, random_state=random_stat)
+        copied.var['cluster'] = km.fit_predict(copied.varm['pca'])  # gene clustering
+        copied.var['score'] = tl.compute_gene_closeness(copied, km.cluster_centers_)
+        tl.filter_adata(copied, mode, random_stat)
+    else:
+        tl.find_high_confidence_cells(copied, n_cell_clusters, random_stat=random_stat)
+        tl.filter_adata(copied, mode, random_stat)
+        # find gene cluster labels and calculate the gene-level scores
+        copied.var['cluster'] = 0
+        copied.var['score'] = 1
+
+    selected_genes = select_from_clusters(copied, mode)
+
+    # TODO: remove this preparation for GO analysis
+    prepare_GO(copied, save='cache/')
+
     # check if all selected features are in var_names
-    is_selected = np.isin(adata.var_names, selected_genes)
+    is_selected = np.isin(raw_adata.var_names, selected_genes)
     if is_selected.sum() != selected_genes.shape[0]:
         raise RuntimeError(f"Only found {is_selected.sum()} selected genes in adata.var_names, not {selected_genes.shape[0]}.")
-    # subset adata or return selected genes
-    if subset:
-        adata._inplace_subset_var(is_selected)
-    else:
-        return selected_genes
+    return selected_genes
+
+
+
+
+
+
+
+
+

@@ -5,7 +5,7 @@
 # @Software: PyCharm
 import anndata as ad
 
-from pagest.utils import load_example_adata
+from scGeneClust._utils import load_example_adata
 
 
 def test_load_example_adata():

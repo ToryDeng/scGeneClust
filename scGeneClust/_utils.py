@@ -3,13 +3,14 @@
 # @Author : Tory Deng
 # @File : _utils.py
 # @Software: PyCharm
+import os
+import sys
+from typing import Literal, Optional
+
 import anndata as ad
 import numpy as np
-from loguru import logger
 import scanpy as sc
-import sys
-from numpy.random import default_rng
-from typing import Literal, Optional
+from loguru import logger
 
 
 def _check_raw_counts(adata: ad.AnnData):
@@ -17,38 +18,7 @@ def _check_raw_counts(adata: ad.AnnData):
         raise ValueError("Expect count data in `.raw` as input.")
     else:
         if not np.all(adata.X % 1 == 0):
-            raise ValueError("The input data in `.X` seems to have been normalized.")
-
-
-def _check_params(
-        mode: Literal['one-way', 'two-way'],
-        n_components: int,
-        n_gene_clusters: Optional[int],
-        n_gene_neighbors: Optional[int],
-        n_cell_clusters: Optional[int],
-        verbosity: Literal[0, 1, 2]
-):
-    assert isinstance(n_components, int) and n_components > 0, TypeError("`n_components` must be a nonnegative integer!")
-    assert verbosity in (0, 1, 2), ValueError(f"`verbose` can only be 0, 1 or 2.")
-
-    if mode == 'one-way':
-        if n_gene_clusters is None:
-            logger.info("`n_gene_clusters` is None. Using default value (200)")
-            n_gene_clusters = 200
-        logger.info("Will ignore `n_gene_neighbors`")
-        logger.info("Will ignore `n_cell_clusters`")
-        n_gene_neighbors, n_cell_clusters = None, None
-    elif mode == 'two-way':
-        logger.info("Will ignore `n_gene_clusters`")
-        n_gene_clusters = None
-        if n_gene_neighbors is None:
-            logger.info("`n_gene_neighbors` is None. Using default value (30)")
-            n_gene_neighbors = 30
-        assert n_cell_clusters is not None, \
-            ValueError("Argument `n_cell_clusters` must be specified in 'two-way' mode!")
-    else:
-        raise ValueError(f"Argument `mode` can only be 'one-way' or 'two-way', not '{mode}'.")
-    return n_gene_clusters, n_gene_neighbors, n_cell_clusters
+            raise ValueError("The input data in `.X` may have been normalized.")
 
 
 def load_example_adata(min_genes: int = 200, min_cells: int = 3) -> ad.AnnData:
@@ -56,6 +26,7 @@ def load_example_adata(min_genes: int = 200, min_cells: int = 3) -> ad.AnnData:
     sc.pp.filter_cells(example, min_genes=min_genes)
     sc.pp.filter_genes(example, min_cells=min_cells)
     example.X = example.X.toarray()
+    example.var['original_gene'] = example.var_names
     example.raw = example
     sc.pp.normalize_total(example)
     example.layers['normalized'] = example.X.copy()
@@ -68,10 +39,15 @@ def load_example_adata(min_genes: int = 200, min_cells: int = 3) -> ad.AnnData:
 
 def set_logger(verbosity: Literal[0, 1, 2] = 1):
     """
-    set the verbosity level.
+    Set the verbosity level.
 
-    :param verbosity: integer in [0, 1, 2]. 0: only print warnings and errors; 1: also print info; 2: also print debug message
-    :return: None
+    Parameters
+    ----------
+    verbosity
+      integer in [0, 1, 2]. 0: only print warnings and errors; 1: also print info; 2: also print debug message
+    Returns
+    -------
+
     """
     def formatter(record: dict):
         if record['level'].name in ('DEBUG', 'INFO'):
@@ -91,24 +67,42 @@ def select_from_clusters(
         adata: ad.AnnData,
         mode: str,
 ) -> np.ndarray:
-    """
-    Select 2 genes from each gene clusters.
-
-    :param adata: The AnnData object. adata.var must contain 'cluster' and 'score' columns and is indexed by genes
-    :param mode:
-    :return: ndarray, selected features
-    """
     assert 'cluster' in adata.var, KeyError(f"Column not found in `.var`: 'cluster'")
     assert 'score' in adata.var, KeyError(f"Column not found in `.var`: 'score'")
     df = adata.var.loc[:, ('cluster', 'score')].rename_axis('gene')
     grouped = df.groupby(by='cluster')['score']
-    if mode == 'one-way':
+    if mode == 'fast':
         max_genes = grouped.nlargest(1).reset_index(level=1)['gene'].values
         min_genes = grouped.nsmallest(1).reset_index(level=1)['gene'].values
         selected_features = np.unique(np.concatenate([min_genes, max_genes]))  # the max and min values may be the same
     else:
-        selected_features = grouped.nlargest(2).reset_index(level=1)['gene'].values
+        # TODO: change the line below
+        selected_features = grouped.nlargest(1).reset_index(level=1)['gene'].values
     logger.debug(f"Selected {selected_features.shape[0]} features")
     return selected_features
+
+
+def prepare_GO(raw_adata: ad.AnnData, save: Optional[str] = None, name=None):
+    assert 'original_gene' in raw_adata.var, ValueError("Column 'original_gene' not in adata.var")
+    assert 'cluster' in raw_adata.var and 'score' in raw_adata.var, ValueError("Must run `scGeneClust` first!")
+
+    sc.pp.highly_variable_genes(raw_adata, n_top_genes=500, flavor='seurat_v3')
+    if save is not None:
+        if not os.path.exists(save):
+            os.makedirs(save)
+
+        if name is None:
+            if 'data_name' not in raw_adata.uns:
+                name = 'data'
+            else:
+                name = raw_adata.uns['data_name']
+
+        path_to_save = os.path.join(save, f"{name}.csv")
+        raw_adata.var.loc[:, ['original_gene', 'cluster', 'score', 'variances_norm']].to_csv(path_to_save, index=False)
+        logger.info(f"data has been saved at {path_to_save}")
+    logger.info("Preparation done!")
+
+
+
 
 
