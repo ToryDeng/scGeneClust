@@ -3,7 +3,7 @@
 # @Author : Tory Deng
 # @File : filtering.py
 # @Software: PyCharm
-from typing import Literal, Optional
+from typing import Optional
 
 import anndata as ad
 import numpy as np
@@ -11,8 +11,7 @@ from loguru import logger
 from sklearn.ensemble import IsolationForest
 
 
-def filter_adata(adata: ad.AnnData, mode: Literal['fast', 'hc'], random_stat: Optional[int]):
-
+def handle_single_gene_cluster(adata: ad.AnnData, random_stat: Optional[int]):
     gene_cluster_counts = adata.var['cluster'].value_counts()
     # summary of gene clustering
     logger.debug(f"Total number of gene clusters: {gene_cluster_counts.shape[0]}")
@@ -28,25 +27,20 @@ def filter_adata(adata: ad.AnnData, mode: Literal['fast', 'hc'], random_stat: Op
         deviances = compute_deviance(adata.X[:, is_single_cluster])
         is_outlier = IsolationForest(random_state=random_stat).fit_predict(deviances.reshape(-1, 1)) == -1
         keep_genes = np.logical_or(~is_single_cluster, adata.var_names.isin(single_cluster_genes[is_outlier]))
-    else:
-        keep_genes = np.ones(shape=(adata.n_vars,), dtype=bool)
+        logger.debug(f"Removing {adata.n_vars - keep_genes.sum()} single gene clusters...")
+        adata._inplace_subset_var(keep_genes)
 
-    # filter_adata cells
-    if mode == 'fast':
-        keep_cells = np.ones(shape=(adata.n_obs,), dtype=bool)
-    else:
-        logger.debug(f"Size of cell clusters: \n{adata.obs['cluster'].value_counts()}")
-        keep_cells = adata.obs['highly_confident']
-        logger.debug(f"Removing {adata.n_obs - keep_cells.sum()} low-confidence cells...")
 
-    logger.debug(f"Removing {adata.n_vars - keep_genes.sum()} single gene clusters...")
-
-    adata._inplace_subset_var(keep_genes)
-    adata._inplace_subset_obs(keep_cells)
-    # further filter_adata constant genes
+def filter_constant_genes(adata: ad.AnnData):
     is_constant_genes = np.all(adata.X == adata.X[0, :], axis=0)
     logger.debug(f"Removing {is_constant_genes.sum()} constant genes...")
     adata._inplace_subset_var(~is_constant_genes)
+
+
+def filter_highly_confident_cells(adata: ad.AnnData):
+    logger.debug(f"Size of cell clusters: \n{adata.obs['cluster'].value_counts()}")
+    logger.debug(f"Removing {adata.n_obs - adata.obs['highly_confident'].sum()} low-confidence cells...")
+    adata._inplace_subset_obs(adata.obs['highly_confident'])
 
 
 def compute_deviance(X: np.ndarray):

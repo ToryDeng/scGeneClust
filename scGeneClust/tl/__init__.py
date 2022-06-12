@@ -6,4 +6,4 @@
 
 from ._utils import compute_gene_closeness
 from .confidence import find_high_confidence_cells
-from .filtering import filter_adata
+from .filtering import handle_single_gene_cluster, filter_constant_genes, filter_highly_confident_cells

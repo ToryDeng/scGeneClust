@@ -21,7 +21,7 @@ def preprocess(adata: ad.AnnData, mode: Literal['fast', 'hc']):
     logger.info(f"Start to preprocess the data...")
 
     # normalization
-    if mode == 'fast':
+    if mode == 'hc':
         # for cells
         adata.layers['X_cell_norm'] = sc.pp.normalize_total(adata, inplace=False)['X']
         adata.layers['X_cell_log'] = sc.pp.log1p(adata.layers['X_cell_norm'], copy=True)  # after log-normalizations

@@ -35,10 +35,11 @@ def scGeneClust(
         km = MiniBatchKMeans(n_clusters=n_gene_clusters, random_state=random_stat)
         copied.var['cluster'] = km.fit_predict(copied.varm['pca'])  # gene clustering
         copied.var['score'] = tl.compute_gene_closeness(copied, km.cluster_centers_)
-        tl.filter_adata(copied, mode, random_stat)
+        tl.handle_single_gene_cluster(copied, random_stat)
+        tl.filter_constant_genes(copied)
     else:
         tl.find_high_confidence_cells(copied, n_cell_clusters, random_stat=random_stat)
-        tl.filter_adata(copied, mode, random_stat)
+        tl.filter_highly_confident_cells(copied)
         # find gene cluster labels and calculate the gene-level scores
         copied.var['cluster'] = 0
         copied.var['score'] = 1
