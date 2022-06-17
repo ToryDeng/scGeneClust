@@ -21,7 +21,9 @@ def scGeneClust(
         n_gene_clusters: Optional[int] = None,
         n_cell_clusters: Optional[int] = None,
         verbosity: Literal[0, 1, 2] = 1,
-        random_stat: Optional[int] = None,
+        rlv_threshold: float=0.01,
+        scale: int=2000,
+        random_stat: Optional[int] = None
 ):
     set_logger(verbosity)
     _check_raw_counts(raw_adata)
@@ -35,16 +37,14 @@ def scGeneClust(
         km = MiniBatchKMeans(n_clusters=n_gene_clusters, random_state=random_stat)
         copied.var['cluster'] = km.fit_predict(copied.varm['pca'])  # gene clustering
         copied.var['score'] = tl.compute_gene_closeness(copied, km.cluster_centers_)
-        tl.handle_single_gene_cluster(copied, random_stat)
-        tl.filter_constant_genes(copied)
+        # tl.filter_adata(copied, mode, random_stat)
+        selected_genes = select_from_clusters(copied, mode)
     else:
-        tl.find_high_confidence_cells(copied, n_cell_clusters, random_stat=random_stat)
-        tl.filter_highly_confident_cells(copied)
-        # find gene cluster labels and calculate the gene-level scores
-        copied.var['cluster'] = 0
-        copied.var['score'] = 1
-
-    selected_genes = select_from_clusters(copied, mode)
+        tl.find_high_confidence_cells(copied, n_cell_clusters, random_stat)
+        # tl.filter_adata(copied, mode, random_stat)
+        tl.find_relevant_gene(copied, rlv_threshold, random_stat)
+        selected_genes = tl.clustering(copied, scale, random_stat)
+           
 
     # TODO: remove this preparation for GO analysis
     prepare_GO(copied, save='cache/')
