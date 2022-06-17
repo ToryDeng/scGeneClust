@@ -74,7 +74,7 @@ def select_from_clusters(
     if mode == 'fast':
         max_genes = grouped.nlargest(1).reset_index(level=1)['gene'].values
         min_genes = grouped.nsmallest(1).reset_index(level=1)['gene'].values
-        selected_features = np.unique(np.concatenate([min_genes, max_genes]))  # the max and min values may be the same
+        selected_features = np.unique(np.concatenate([max_genes, min_genes]))  # the max and min values may be the same
     else:
         # TODO: change the line below
         selected_features = grouped.nlargest(1).reset_index(level=1)['gene'].values

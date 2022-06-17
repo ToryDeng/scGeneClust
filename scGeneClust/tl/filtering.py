@@ -37,7 +37,7 @@ def filter_constant_genes(adata: ad.AnnData):
     adata._inplace_subset_var(~is_constant_genes)
 
 
-def filter_highly_confident_cells(adata: ad.AnnData):
+def filter_low_confidence_cells(adata: ad.AnnData):
     logger.debug(f"Size of cell clusters: \n{adata.obs['cluster'].value_counts()}")
     logger.debug(f"Removing {adata.n_obs - adata.obs['highly_confident'].sum()} low-confidence cells...")
     adata._inplace_subset_obs(adata.obs['highly_confident'])

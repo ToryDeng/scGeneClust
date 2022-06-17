@@ -40,26 +40,18 @@ def scGeneClust(
         # tl.filter_adata(copied, mode, random_stat)
         selected_genes = select_from_clusters(copied, mode)
     else:
-        tl.find_high_confidence_cells(copied, n_cell_clusters, random_stat)
+        tl.find_high_confidence_cells(copied, n_cell_clusters, random_stat=random_stat)
         # tl.filter_adata(copied, mode, random_stat)
         tl.find_relevant_gene(copied, rlv_threshold, random_stat)
         selected_genes = tl.clustering(copied, scale, random_stat)
-           
+
 
     # TODO: remove this preparation for GO analysis
-    prepare_GO(copied, save='cache/')
+    # prepare_GO(copied, save='cache/')
 
     # check if all selected features are in var_names
     is_selected = np.isin(raw_adata.var_names, selected_genes)
     if is_selected.sum() != selected_genes.shape[0]:
-        raise RuntimeError(f"Only found {is_selected.sum()} selected genes in adata.var_names, not {selected_genes.shape[0]}.")
+        raise RuntimeError(
+            f"Only found {is_selected.sum()} selected genes in adata.var_names, not {selected_genes.shape[0]}.")
     return selected_genes
-
-
-
-
-
-
-
-
-
