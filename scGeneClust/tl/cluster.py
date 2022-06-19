@@ -35,7 +35,8 @@ def clustering(
             MST_pruned.remove_edge(node_pair[0], node_pair[1])
 
     #Cluster:find subtrees
-    clusters = list(nx.connected_components(MST)) 
+    clusters = list(nx.connected_components(MST_pruned)) 
+    print("number of clusters:",len(clusters))
     adata.var['cluster'] = None
     for i in range(len(clusters)):
         if len(clusters[i]) == 1:
@@ -49,7 +50,10 @@ def clustering(
     grouped = adata.var[adata.var['cluster'] != -1].groupby(by='cluster')['score']
     for i in range(len(grouped.nlargest(1))):
        adata.var['representative'][grouped.nlargest(1).index[i][1]] = True
-    handle_single_gene_cluster(adata, mode='hc', random_stat=random_stat)
+    
+    print("number of rep genes in non single cluster:", len(adata.var[adata.var['representative'] == True]))
+    if len(adata.var[adata.var['cluster'] == -1])>0:
+        handle_single_gene_cluster(adata, mode='hc', random_stat=random_stat)
     
     logger.info(f"Gene clustering finished...")
 
