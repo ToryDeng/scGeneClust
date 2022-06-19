@@ -57,17 +57,6 @@ def clustering(
     
     logger.info(f"Gene clustering finished...")
 
-def complementarity(
-                adata: ad.AnnData,
-                node1: int, 
-                node2: int, 
-                random_stat: int):
-    cmi = 0
-    for clus in np.unique(adata.obs['cluster']):
-            rlv = mutual_info_regression(adata.layers['X_gene_log'][:,node1].reshape(-1,1),adata.layers['X_gene_log'][:,node2],random_state=random_stat)
-            cmi += rlv*(len(adata.obs[adata.obs['cluster'] == clus])/len(adata.obs))
-    return cmi
-
 
 def prune(adata, node1, node2, weight, scale):
     class_rlv = min(adata.var['score'][node1], adata.var['score'][node2])
@@ -76,3 +65,16 @@ def prune(adata, node1, node2, weight, scale):
         return node1, node2
     else: 
         return None
+
+def complementarity(
+                adata: ad.AnnData,
+                node1: int, 
+                node2: int, 
+                random_stat: int):
+    cmi = 0
+    for clus in np.unique(adata.obs['cluster']):
+        rlv = mutual_info_regression(adata.layers['X_gene_log'][adata.obs['cluster'] == clus][:,node1].reshape(-1,1),
+                                     adata.layers['X_gene_log'][adata.obs['cluster'] == clus][:,node2],
+                                     random_state=random_stat)
+        cmi += rlv*(len(adata.obs[adata.obs['cluster'] == clus])/len(adata.obs))
+    return cmi
