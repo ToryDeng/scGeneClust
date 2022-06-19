@@ -76,8 +76,7 @@ def select_from_clusters(
         min_genes = grouped.nsmallest(1).reset_index(level=1)['gene'].values
         selected_features = np.unique(np.concatenate([max_genes, min_genes]))  # the max and min values may be the same
     else:
-        # TODO: change the line below
-        selected_features = grouped.nlargest(1).reset_index(level=1)['gene'].values
+        selected_features = adata.var.index
     logger.debug(f"Selected {selected_features.shape[0]} features")
     return selected_features
 

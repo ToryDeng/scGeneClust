@@ -4,7 +4,6 @@
 # @File : _model.py
 # @Software: PyCharm
 from typing import Literal, Optional
-
 import anndata as ad
 import numpy as np
 from sklearn.cluster import MiniBatchKMeans
@@ -40,18 +39,29 @@ def scGeneClust(
         # tl.filter_adata(copied, mode, random_stat)
         selected_genes = select_from_clusters(copied, mode)
     else:
-        tl.find_high_confidence_cells(copied, n_cell_clusters, random_stat=random_stat)
-        # tl.filter_adata(copied, mode, random_stat)
-        tl.find_relevant_gene(copied, rlv_threshold, random_stat)
-        selected_genes = tl.clustering(copied, scale, random_stat)
+        tl.find_high_confidence_cells(copied, n_cell_clusters = n_cell_clusters, random_stat=random_stat)
+        tl.filter_low_confidence_cells(copied)
+        tl.filter_unrelevant_gene(copied, rlv_threshold, random_stat)
+        tl.clustering(copied, scale, random_stat)
+        
+        selected_genes = select_from_clusters(copied, mode)
 
+           
 
     # TODO: remove this preparation for GO analysis
-    # prepare_GO(copied, save='cache/')
+    prepare_GO(copied, save='cache/')
 
     # check if all selected features are in var_names
     is_selected = np.isin(raw_adata.var_names, selected_genes)
     if is_selected.sum() != selected_genes.shape[0]:
-        raise RuntimeError(
-            f"Only found {is_selected.sum()} selected genes in adata.var_names, not {selected_genes.shape[0]}.")
+        raise RuntimeError(f"Only found {is_selected.sum()} selected genes in adata.var_names, not {selected_genes.shape[0]}.")
     return selected_genes
+
+
+
+
+
+
+
+
+

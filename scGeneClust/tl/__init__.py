@@ -6,6 +6,5 @@
 
 from ._utils import compute_gene_closeness
 from .confidence import find_high_confidence_cells
-from .filtering import handle_single_gene_cluster, filter_constant_genes, filter_low_confidence_cells
-from .relevance import find_relevant_gene
+from .filtering import handle_single_gene_cluster, filter_constant_genes, filter_low_confidence_cells, filter_unrelevant_gene
 from .cluster import clustering
