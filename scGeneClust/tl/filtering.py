@@ -3,7 +3,7 @@
 # @Author : Tory Deng
 # @File : filtering.py
 # @Software: PyCharm
-from typing import Literal,Optional
+from typing import Literal, Optional
 
 import anndata as ad
 import numpy as np
@@ -21,7 +21,6 @@ def handle_single_gene_cluster(adata: ad.AnnData, mode: Literal['fast', 'hc'], r
     cluster_size_counts = gene_cluster_counts.value_counts(bins=bins, sort=False)
     logger.debug(f"Bins of the gene cluster size: \n{cluster_size_counts[cluster_size_counts > 0]}")
 
-    
     # filter_adata inliers in single gene clusters
     if mode == 'fast':
         is_single_cluster = adata.var['cluster'].isin(gene_cluster_counts[gene_cluster_counts == 1].index)
@@ -33,11 +32,12 @@ def handle_single_gene_cluster(adata: ad.AnnData, mode: Literal['fast', 'hc'], r
             logger.debug(f"Removing {adata.n_vars - keep_genes.sum()} single gene clusters...")
             adata._inplace_subset_var(keep_genes)
     else:
-        thres = min(adata.var.loc[adata.var['representative'] == True, 'score'])
+        thres = min(adata.var.loc[adata.var['representative'], 'score'])
         for i in adata.var[adata.var['cluster'] == -1].index:
             if adata.var['score'][i] > thres:
-                    adata.var['representative'][i] = True
+                adata.var['representative'][i] = True
         adata._inplace_subset_var(adata.var['representative'])
+
 
 def filter_constant_genes(adata: ad.AnnData):
     is_constant_genes = np.all(adata.X == adata.X[0, :], axis=0)
@@ -60,14 +60,15 @@ def compute_deviance(X: np.ndarray):
     return 2 * (left_half + right_half)
 
 
-def filter_unrelevant_gene(
+def filter_irrelevant_gene(
         adata: ad.AnnData,
         rlv_threshold: float = 0.01,
-        random_stat: int = 42):
-
-    #find relevant gene according to mutual information with cluster label based on high confident cells
+        random_stat: int = 42
+):
+    # find relevant gene according to mutual information with cluster label based on high confident cells
     logger.info(f"Start to find relevant genes...")
-    relevance = mutual_info_classif(adata.layers['X_gene_log'],adata.obs.cluster,discrete_features=True,random_state=random_stat)
+    relevance = mutual_info_classif(adata.layers['X_gene_log'], adata.obs.cluster,
+                                    discrete_features=False, random_state=random_stat)
     adata.var['score'] = relevance
     adata._inplace_subset_var(relevance > rlv_threshold)
     logger.info(f"Relevant gene detection finished!")

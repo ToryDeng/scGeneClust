@@ -10,6 +10,8 @@ from typing import Literal, Optional
 import anndata as ad
 import numpy as np
 import scanpy as sc
+from rpy2.robjects import globalenv, r
+import anndata2ri
 from loguru import logger
 
 
@@ -49,6 +51,7 @@ def set_logger(verbosity: Literal[0, 1, 2] = 1):
     -------
 
     """
+
     def formatter(record: dict):
         if record['level'].name in ('DEBUG', 'INFO'):
             return "<level>{level: <5}</level> | " \
@@ -81,7 +84,7 @@ def select_from_clusters(
     return selected_features
 
 
-def prepare_GO(raw_adata: ad.AnnData, save: Optional[str] = None, name=None):
+def prepare_GO(raw_adata: ad.AnnData, save: Optional[str] = None, name=None, save_type='Rdata'):
     assert 'original_gene' in raw_adata.var, ValueError("Column 'original_gene' not in adata.var")
     assert 'cluster' in raw_adata.var and 'score' in raw_adata.var, ValueError("Must run `scGeneClust` first!")
 
@@ -95,13 +98,18 @@ def prepare_GO(raw_adata: ad.AnnData, save: Optional[str] = None, name=None):
                 name = 'data'
             else:
                 name = raw_adata.uns['data_name']
+        if save_type == 'csv':
+            path_to_save = os.path.join(save, f"{name}.csv")
+            raw_adata.var.loc[:, ['original_gene', 'cluster', 'score', 'variances_norm']].to_csv(path_to_save,
+                                                                                                 index=False)
+        else:
+            path_to_save = os.path.join(save, f"{name}.Rdata")
+            anndata2ri.activate()
+            globalenv['sce'], globalenv['path'] = anndata2ri.py2rpy(raw_adata), path_to_save
+            r("""
+            save(sce, file = path)
+            """)
+            anndata2ri.deactivate()
 
-        path_to_save = os.path.join(save, f"{name}.csv")
-        raw_adata.var.loc[:, ['original_gene', 'cluster', 'score', 'variances_norm']].to_csv(path_to_save, index=False)
         logger.info(f"data has been saved at {path_to_save}")
     logger.info("Preparation done!")
-
-
-
-
-

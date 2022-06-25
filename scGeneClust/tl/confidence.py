@@ -89,7 +89,7 @@ def find_high_confidence_cells(
 
     # compute the frequency matrix
     pool = ThreadPool(processes=os.cpu_count() - 1)
-    top_comps = [adata.obsm['pca'][:, :i] for i in range(1, 11)]
+    top_comps = [adata.obsm['pca'][:, :i] for i in range(2, 12)]
     partial_compute = partial(_compute_cell_co_membership, n_clusters=n_cell_clusters, seed=random_stat, p=high_prob)
     results = pool.map(partial_compute, top_comps)
     frequency_matrix = squareform(np.sum(results, axis=0))
