@@ -45,6 +45,7 @@ def scGeneClust(
         tl.filter_low_confidence_cells(copied)
         tl.filter_irrelevant_gene(copied, rlv_threshold, random_stat)
         tl.clustering(copied, scale, random_stat)
+        tl.handle_single_gene_cluster(copied, mode='hc', random_stat=random_stat)
 
     selected_genes = select_from_clusters(copied, mode)
 

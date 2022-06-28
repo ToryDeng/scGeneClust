@@ -20,23 +20,28 @@ def handle_single_gene_cluster(adata: ad.AnnData, mode: Literal['fast', 'hc'], r
     bins = [0.001, 1, 5, 1e1, 5e1, 1e2, 5e2, 1e3, 5e3, 1e4, 5e4]
     cluster_size_counts = gene_cluster_counts.value_counts(bins=bins, sort=False)
     logger.debug(f"Bins of the gene cluster size: \n{cluster_size_counts[cluster_size_counts > 0]}")
+    is_single_cluster = adata.var['cluster'].isin(gene_cluster_counts[gene_cluster_counts == 1].index)
 
-    # filter_adata inliers in single gene clusters
-    if mode == 'fast':
-        is_single_cluster = adata.var['cluster'].isin(gene_cluster_counts[gene_cluster_counts == 1].index)
-        if is_single_cluster.sum() > 0:
+    if is_single_cluster.sum() > 0:
+        if mode == 'fast':
             single_cluster_genes = adata.var_names[is_single_cluster]
             deviances = compute_deviance(adata.X[:, is_single_cluster])
             is_outlier = IsolationForest(random_state=random_stat).fit_predict(deviances.reshape(-1, 1)) == -1
             keep_genes = np.logical_or(~is_single_cluster, adata.var_names.isin(single_cluster_genes[is_outlier]))
             logger.debug(f"Removing {adata.n_vars - keep_genes.sum()} single gene clusters...")
             adata._inplace_subset_var(keep_genes)
+        else:
+            adata.var['representative'] = False
+            grouped = adata.var[~is_single_cluster].groupby(by='cluster')['score']
+            for i in range(len(grouped.nlargest(1))):
+                adata.var.loc[grouped.nlargest(1).index[i][1], 'representative'] = True
+            logger.debug(f"Number of representative genes in non-single cluster: {adata.var['representative'].sum()}")
+            thres = adata.var.loc[adata.var['representative'], 'score'].min()
+            adata.var.loc[is_single_cluster, 'representative'] = adata.var.loc[is_single_cluster, 'score'] > thres
+            adata._inplace_subset_var(adata.var['representative'])
     else:
-        thres = min(adata.var.loc[adata.var['representative'], 'score'])
-        for i in adata.var[adata.var['cluster'] == -1].index:
-            if adata.var['score'][i] > thres:
-                adata.var['representative'][i] = True
-        adata._inplace_subset_var(adata.var['representative'])
+        logger.debug("Not found any single gene cluster ...")
+
 
 
 def filter_constant_genes(adata: ad.AnnData):
