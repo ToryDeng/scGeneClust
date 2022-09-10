@@ -24,6 +24,14 @@ def leiden(
         resolution: float = 1.0,
         seed: Optional[int] = None
 ):
+    """
+    Perform Leiden clustering on cells or genes.
+
+    :param data: Either an `AnnData` object or an ndarray.
+    :param on: On which dimension Leiden is performed.
+    :param resolution: Clustering resolution.
+    :param seed: Random seed.
+    """
     if isinstance(data, ad.AnnData):
         if on is None:
             raise TypeError("`on` can not be None when `data` is `ad.AnnData` object!")
@@ -60,6 +68,7 @@ def _compute_cell_co_membership(
         seed: Optional[int] = None,
         p: float = 0.95
 ) -> np.ndarray:
+    """Perform GMM clustering on certain PCs."""
     X = X.reshape(-1, 1) if X.ndim == 1 else X
     gmm = GaussianMixture(n_components=n_clusters, init_params='k-means++', random_state=seed)
     gmm.fit(X)
@@ -81,6 +90,14 @@ def find_high_confidence_cells(
         n_cell_clusters: int,
         random_stat: Optional[int] = None,
 ):
+    """
+    Find cells that are highly likely to be in the same type (high-confidence cells).
+
+    :param adata: The annotated matrix. GeneClust expects raw counts.
+    :param n_cell_clusters: The number of cell clusters. Only used in GeneClust-ps.
+    :param random_stat: Change to use different initial states for the optimization.
+    :return:
+    """
     logger.info(f"Finding high-confidence cells...")
 
     # compute the frequency matrix

@@ -75,18 +75,21 @@ def gene_clustering_graph(
 
 
 def cal_mi(i: int, j: int, data: np.ndarray, random_stat: Optional[int]):
+    """Calculate mutual information between the i-th and j-th genes."""
     return mutual_info_regression(
         data[:, i].reshape(-1, 1), data[:, j], discrete_features=False, random_state=random_stat
     )[0]
 
 
 def prune(node1: int, node2: int, w, data, clusters, rlv, scale, random_stat):
+    """Determine whether to remove the edge between two ndoes in the gene-gene graph."""
     class_rlv = min(rlv[node1], rlv[node2])
     complm = cal_complementarity(data, clusters, node1, node2, random_stat)
     return (node1, node2) if w['weight'] * scale < max(class_rlv, complm) else None
 
 
 def cal_complementarity(data, clusters, n1: int, n2: int, random_stat: Optional[int]):
+    """Calculate complementarity between two genes."""
     cmi = 0
     for clus in np.unique(clusters):
         clus_mask = clusters == clus

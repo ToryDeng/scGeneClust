@@ -51,19 +51,21 @@ def handle_single_gene_cluster(adata: ad.AnnData, version: Literal['fast', 'ps']
 
 
 def filter_constant_genes(adata: ad.AnnData):
+    """Filter genes whose expression levels remain unchanged through all the cells."""
     is_constant_genes = np.all(adata.X == adata.X[0, :], axis=0)
     logger.debug(f"Removing {is_constant_genes.sum()} constant genes...")
     adata._inplace_subset_var(~is_constant_genes)
 
 
 def filter_low_confidence_cells(adata: ad.AnnData):
+    """Filter cells that are not highly confident."""
     logger.debug(f"Size of cell clusters: \n{adata.obs['cluster'].value_counts()}")
     logger.debug(f"Removing {adata.n_obs - adata.obs['highly_confident'].sum()} low-confidence cells...")
     adata._inplace_subset_obs(adata.obs['highly_confident'])
 
 
 def compute_deviance(X: np.ndarray):
-    """Compute deviance score for each single gene cluster"""
+    """Compute deviance score for each single gene cluster."""
     pi = X.sum(0) / X.sum()
     n = X.sum(1)[:, np.newaxis]
     with np.errstate(all='ignore'):
@@ -73,7 +75,7 @@ def compute_deviance(X: np.ndarray):
 
 
 def filter_irrelevant_gene(adata: ad.AnnData, top_pct: int, random_stat: int):
-    """Find relevant genes according to mutual information with cluster labels of highly confident cells"""
+    """Find relevant genes according to mutual information with cluster labels of highly confident cells."""
     logger.info(f"Start to find relevant genes...")
     relevance = mutual_info_classif(adata.layers['X_gene_log'], adata.obs.cluster,
                                     discrete_features=False, random_state=random_stat)

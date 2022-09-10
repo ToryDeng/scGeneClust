@@ -16,6 +16,7 @@ def reduce_dimension(
         random_stat: Optional[int],
 ):
     """
+    Reduce gene-level dimension (in GeneClust-ps) or cell-level dimension (in GeneClust-fast) of data.
 
     :param adata: The annotated data matrix.
     :param version: Version of GeneClust.
