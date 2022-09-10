@@ -17,9 +17,9 @@ def reduce_dimension(
 ):
     """
 
-    :param adata: The annotated data matrix
-    :param version: Version of GeneClust
-    :param random_stat: Change to use different initial states for the optimization
+    :param adata: The annotated data matrix.
+    :param version: Version of GeneClust.
+    :param random_stat: Change to use different initial states for the optimization.
     """
     logger.info("Reducing data dimension...")
     if version == 'fast':

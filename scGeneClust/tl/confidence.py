@@ -45,12 +45,12 @@ def leiden(
     directed = False if np.allclose(adjacency, adjacency.T) else True
     logger.debug(f"Creating {'directed' if directed else 'undirected'} graph on {on}...")
     G = sc._utils.get_igraph_from_adjacency(adjacency, directed=directed)
-    logger.debug("Leiden gene_clustering_graph starts...")
+    logger.debug("Leiden clustering starts...")
     partition = leidenalg.find_partition(G, partition_type=leidenalg.RBConfigurationVertexPartition,
                                          weights=G.es['weight'],
                                          n_iterations=-1, resolution_parameter=resolution, seed=seed)
     cluster_labels = np.array(partition.membership)
-    logger.debug("Leiden gene_clustering_graph finished!")
+    logger.debug("Leiden clustering finished!")
     return cluster_labels
 
 
@@ -94,7 +94,7 @@ def find_high_confidence_cells(
         cut_matrix = np.where(frequency_matrix < freq_th, 0, frequency_matrix)
         cluster_labels = leiden(cut_matrix, seed=random_stat, on='cell')
         cluster_counts = pd.Series(cluster_labels).value_counts(ascending=False)
-        cut_k = min(n_cell_clusters, np.argwhere((cluster_counts > 10).values).squeeze()[0])
+        cut_k = min(n_cell_clusters, np.argwhere((cluster_counts < 10).values).squeeze()[0])
         valid_clusters = cluster_counts.index[:cut_k]
         is_confident = np.isin(cluster_labels, valid_clusters)
         if is_confident.sum() / is_confident.shape[0] > 0.05:

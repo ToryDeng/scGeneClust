@@ -1,1 +1,2 @@
-# **scGeneClust**: single-cell feature selection via gene gene_clustering_graph
+# **GeneClust**: cofunctional grouping-based feature gene selection for unsupervised scRNA-seq clustering
+GeneClust is a computational feature selection method for scRNA-seq cell clustering. GeneClust groups genes into clusters from which genes are evaluated and selected with the aim of maximizing relevance, minimizing redundancy and preserving complementarity. GeneClust has two versions: GeneClust-fast and GeneClust-ps. GeneClust-ps is preferred over GeneClust-fast when the datasets only contain a small number of cells (e.g., several thousand), or when cell clustering performance overweighs computational efficiency, and vice versa.

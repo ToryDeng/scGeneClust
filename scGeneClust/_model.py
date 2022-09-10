@@ -4,8 +4,8 @@
 # @File : _model.py
 # @Software: PyCharm
 from typing import Literal, Optional
+
 import anndata as ad
-import numpy as np
 
 import scGeneClust.pp as pp
 import scGeneClust.tl as tl
@@ -25,15 +25,15 @@ def scGeneClust(
     """
     The main function of GeneClust.
 
-    :param raw_adata: GeneClust expects raw counts data.
+    :param raw_adata: The annotated matrix. GeneClust expects raw counts.
     :param version: The version of GeneClust.
     :param n_gene_clusters: The number of gene clusters. Only used in GeneClust-fast.
     :param n_cell_clusters: The number of cell clusters. Only used in GeneClust-ps.
     :param top_percent_relevance: What percentage of genes with top relevance should be preserved.
-    :param scale: The scale factor used in the partition of MST
-    :param verbosity: The verbosity level
-    :param random_stat: Change to use different initial states for the optimization
-    :return:
+    :param scale: The scale factor used in the partition of MST.
+    :param verbosity: The verbosity level.
+    :param random_stat: Change to use different initial states for the optimization.
+    :return: An ndarray of selected features.
     """
     set_logger(verbosity)
     _check_params(raw_adata, version, n_gene_clusters, n_cell_clusters, top_percent_relevance, scale,

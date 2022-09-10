@@ -13,8 +13,16 @@ from sklearn.feature_selection import mutual_info_classif
 
 
 def handle_single_gene_cluster(adata: ad.AnnData, version: Literal['fast', 'ps'], random_stat: Optional[int]):
+    """
+    GeneClust-fast selects outliers from single gene clusters, while GeneClust-ps uses a relevance threshold to filter
+    single gene clusters.
+
+    :param adata: The annotated matrix.
+    :param version: The version of GeneClust.
+    :param random_stat: Change to use different initial states for the optimization.
+    """
     gene_cluster_counts = adata.var['cluster'].value_counts()
-    # summary of gene gene_clustering_graph
+    # summary of gene clustering
     logger.debug(f"Total number of gene clusters: {gene_cluster_counts.shape[0]}")
     logger.debug(f"Total number of single gene clusters: {(gene_cluster_counts == 1).sum()}")
     bins = [0.001, 1, 5, 1e1, 5e1, 1e2, 5e2, 1e3, 5e3, 1e4, 5e4]

@@ -3,28 +3,25 @@
 # @Author : Tory Deng
 # @File : utils.py
 # @Software: PyCharm
-import os
 import sys
 from functools import partial
 from itertools import combinations
 from multiprocessing import cpu_count
 from multiprocessing.pool import Pool
-from typing import Literal, Optional
+from typing import Literal
 
 import anndata as ad
-import anndata2ri
 import numpy as np
 import pandas as pd
 import scanpy as sc
 from loguru import logger
-from rpy2.robjects import globalenv, r
 from scipy.spatial.distance import squareform
-from sklearn.metrics import pairwise_distances
 from sklearn.feature_selection import mutual_info_classif
+from sklearn.metrics import pairwise_distances
 
 
 def _check_raw_counts(adata: ad.AnnData):
-    """Check whether the data in `adata.X` is raw counts"""
+    """Check whether the data in `adata.X` is raw counts."""
     if adata.raw is not None:
         raise ValueError("Expect count data in `.raw` as input.")
     else:
@@ -33,7 +30,7 @@ def _check_raw_counts(adata: ad.AnnData):
 
 
 def _check_params(raw_adata, version, n_gene_clusters, n_cell_clusters, top_percent_rel, scale, verbosity, random_stat):
-    """Check the input parameters"""
+    """Check input parameters of the main function."""
     _check_raw_counts(raw_adata)
     if version == 'fast':
         if n_gene_clusters is None:
@@ -63,25 +60,25 @@ def _check_params(raw_adata, version, n_gene_clusters, n_cell_clusters, top_perc
 
 
 def _check_all_selected(selected_genes, raw_adata):
+    """Check whether all selected genes are in the input `AnnData` object."""
     is_selected = np.isin(raw_adata.var_names, selected_genes)
     if is_selected.sum() != selected_genes.shape[0]:
         msg = f"Only found {is_selected.sum()} selected genes in `adata.var_names`, not {selected_genes.shape[0]}."
         raise RuntimeError(msg)
 
 
-def load_example_adata(min_genes: int = 200, min_cells: int = 3) -> ad.AnnData:
+def load_PBMC3k(min_genes: int = 200, min_cells: int = 3) -> ad.AnnData:
+    """
+    Load the PBMC3k dataset as an example.
+
+    :param min_genes: Minimum number of genes expressed required for a cell to pass filtering.
+    :param min_cells: Minimum number of cells expressed required for a gene to pass filtering.
+    :return: The PBMC3k dataset as an `AnnData` object.
+    """
     example = sc.datasets.pbmc3k()
     sc.pp.filter_cells(example, min_genes=min_genes)
     sc.pp.filter_genes(example, min_cells=min_cells)
     example.X = example.X.toarray()
-    example.var['original_gene'] = example.var_names
-    example.raw = example
-    sc.pp.normalize_total(example)
-    example.layers['normalized'] = example.X.copy()
-    sc.pp.log1p(example)
-    example.layers['log-normalized'] = example.X.copy()
-    sc.pp.scale(example)
-    example.uns['data_name'] = 'pbmc3k'
     return example
 
 
@@ -91,7 +88,6 @@ def set_logger(verbosity: Literal[0, 1, 2] = 1):
 
     :param verbosity: 0 (only print warnings and errors), 1 (also print info), 2 (also print debug messages)
     """
-
     def formatter(record: dict):
         if record['level'].name in ('DEBUG', 'INFO'):
             return "<level>{level: <5}</level> | " \
@@ -110,6 +106,13 @@ def select_from_clusters(
         adata: ad.AnnData,
         version: str,
 ) -> np.ndarray:
+    """
+    Select features from gene clusters.
+
+    :param adata: The annotated matrix.
+    :param version: The version of GeneClust.
+    :return: An ndarray of selected features.
+    """
     assert 'cluster' in adata.var, KeyError(f"Column not found in `.var`: 'cluster'")
     assert 'score' in adata.var, KeyError(f"Column not found in `.var`: 'score'")
     df = adata.var.loc[:, ('cluster', 'score')].rename_axis('gene')
@@ -122,50 +125,3 @@ def select_from_clusters(
         selected_features = adata.var_names[adata.var['representative']]
     logger.debug(f"Selected {selected_features.shape[0]} features")
     return selected_features
-
-
-def compute_cluster_distance(
-        adata: ad.AnnData,
-        use_rep=None,
-        point_distance: str = 'euclidean',
-        cluster_distance: Literal['centroid', 'average', 'complete', 'single'] = 'centroid',
-        inplace: bool = True
-):
-    mtx = adata.layers['X_gene_scale'].T if use_rep is None else adata.varm['pca']  # genes as rows
-    uclusters = np.sort(adata.var['cluster'].unique())
-    if cluster_distance == 'centroid':
-        centroids = np.vstack([mtx[adata.var['cluster'] == cluster, :].mean(axis=0) for cluster in uclusters])
-        cluster_dis_mtx = pairwise_distances(centroids, metric=point_distance, n_jobs=-1)  # (n_clusters, n_clusters)
-    else:
-        gene_dis_mtx = pairwise_distances(mtx, metric=point_distance, n_jobs=-1)  # shape: (n_genes, n_genes)
-        pool = Pool(processes=cpu_count() - 1)
-        partial_compute = partial(
-            compute_cluster_pair_distance,
-            clusters=adata.var['cluster'].values, cluster_dis=cluster_distance, gene_dis_mtx=gene_dis_mtx
-        )
-        cluster_dis_mtx = squareform(pool.starmap(partial_compute, combinations(uclusters, 2)))
-
-    if inplace:
-        adata.uns['gene_cluster_distances'] = pd.DataFrame(cluster_dis_mtx, index=uclusters, columns=uclusters)
-    else:
-        return pd.DataFrame(cluster_dis_mtx, index=uclusters, columns=uclusters)
-
-
-def compute_cluster_pair_distance(cluster_1, cluster_2, clusters, cluster_dis, gene_dis_mtx):
-    cluster_pair_dis_mtx = gene_dis_mtx[np.ix_(clusters == cluster_1, clusters == cluster_2)]
-    if cluster_dis == 'average':
-        return cluster_pair_dis_mtx.mean()
-    elif cluster_dis == 'complete':
-        return cluster_pair_dis_mtx.max()
-    else:
-        return cluster_pair_dis_mtx.min()
-
-
-def compute_cluster_rep_gene_rel(adata: ad.AnnData, seed=None):
-    uclusters = np.sort(adata.var['cluster'].unique())
-    centroids = np.hstack(
-        [adata.layers['X_gene_scale'][:, adata.var['cluster'] == cluster].mean(axis=1).reshape(-1, 1) for cluster in
-         uclusters])
-    relevance = mutual_info_classif(centroids, adata.obs.cluster, discrete_features=False, random_state=seed)
-    adata.uns['gene_cluster_centroid_relevance'] = pd.DataFrame(relevance, index=uclusters.astype(str),
-                                                                columns=['relevance'])

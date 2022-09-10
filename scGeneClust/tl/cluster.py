@@ -7,11 +7,12 @@ from typing import Optional
 import anndata as ad
 import networkx as nx
 import numpy as np
-import scGeneClust.tl as tl
 from loguru import logger
 from scipy.spatial.distance import squareform
 from sklearn.cluster import MiniBatchKMeans
 from sklearn.feature_selection import mutual_info_regression
+
+import scGeneClust.tl as tl
 
 
 def gene_clustering_mbkmeans(
@@ -19,9 +20,18 @@ def gene_clustering_mbkmeans(
         n_gene_clusters: int,
         random_stat: Optional[int]
 ):
+    """
+    Cluster genes based on mini-batch k-means.
+
+    :param adata: The annotated matrix.
+    :param n_gene_clusters: The number of gene clusters. Only used in GeneClust-fast.
+    :param random_stat: Change to use different initial states for the optimization
+    """
+    logger.info(f"Clustering genes...")
     km = MiniBatchKMeans(n_clusters=n_gene_clusters, batch_size=1024, random_state=random_stat)
-    adata.var['cluster'] = km.fit_predict(adata.varm['pca'])  # gene gene_clustering_graph
+    adata.var['cluster'] = km.fit_predict(adata.varm['pca'])  # gene clustering
     adata.var['score'] = tl.compute_gene_closeness(adata, km.cluster_centers_)
+    logger.info(f"Gene clustering finished!")
 
 
 def gene_clustering_graph(
@@ -29,7 +39,14 @@ def gene_clustering_graph(
         scale: int,
         random_stat: Optional[int]
 ):
-    logger.info(f"Start to cluster genes...")
+    """
+    Cluster genes based on graph.
+
+    :param adata: The annotated matrix.
+    :param scale: The scale factor used in the partition of MST.
+    :param random_stat: Change to use different initial states for the optimization.
+    """
+    logger.info(f"Clustering genes...")
 
     # calculate mi between genes to get an upper triangular matrix
     pool = Pool(processes=cpu_count() - 1)  #
@@ -54,7 +71,7 @@ def gene_clustering_graph(
     # cluster genes by finding subtrees
     clusters = list(nx.connected_components(MST))
     adata.var['cluster'] = np.hstack([np.full((len(cluster),), fill_value=i) for i, cluster in enumerate(clusters)])
-    logger.info(f"Gene gene_clustering_graph finished...")
+    logger.info(f"Gene clustering finished!")
 
 
 def cal_mi(i: int, j: int, data: np.ndarray, random_stat: Optional[int]):
