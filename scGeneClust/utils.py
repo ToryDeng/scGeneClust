@@ -99,7 +99,7 @@ def set_logger(verbosity: Literal[0, 1, 2] = 1):
 
     level_dict = {0: 'WARNING', 1: 'INFO', 2: 'DEBUG'}
     logger.remove()
-    logger.add(sys.stderr, level=level_dict[verbosity], format=formatter)
+    logger.add(sys.stdout, level=level_dict[verbosity], format=formatter)
 
 
 def select_from_clusters(
