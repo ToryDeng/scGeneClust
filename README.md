@@ -37,19 +37,8 @@ python3 setup.py install --user
 |   :----:   |   --------   |
 |  GeneClust-ps | 1. Number of cells is small (e.g., several thousand) <br> 2. Cell clustering performance is more important  |
 |  GeneClust-fast   |    1. Number of cells is large (e.g., over 50,000) <br> 2. Computational efficiency is more important   |
-## Example Code
-```python
-from scGeneClust.utils import load_PBMC3k
-from scGeneClust import scGeneClust
-
-# load the PBMC3k dataset
-raw_adata = load_PBMC3k()
-# GeneClust-fast
-selected_genes = scGeneClust(raw_adata, version='fast', n_gene_clusters=200, random_stat=2022, verbosity=2)
-# GeneClust-ps
-selected_genes = scGeneClust(raw_adata, version='ps', n_cell_clusters=7, scale=1000, top_percent_relevance=5, random_stat=2022, verbosity=2)
-```
-GeneClust expects raw counts. The output is an ndarray of selected features, which can be used in the downstream cell clustering analysis.
-
-
-
+## Tutorial
+For the step-by-step tutorial, please refer to the notebook:
+<br>
+https://github.com/ToryDeng/scGeneClust/blob/main/notebooks/tutorial.ipynb
+<br>
