@@ -21,7 +21,7 @@ python3 setup.py install --user
 ```
 ## Two Versions of GeneClust
 | **Version** | **Usage Scenarios** |
-|   :----:   |   :--------   |
+|   :----:   |   --------   |
 |  GeneClust-ps | 1. Number of cells is small (e.g., several thousand) <br> 2. Cell clustering performance is more important  |
 |  GeneClust-fast   |    1. Number of cells is large (e.g., over 50,000) <br> 2. Computational efficiency is more important   |
 ## Example Code
