@@ -17,7 +17,7 @@ GeneClust is a computational feature selection method for scRNA-seq cell cluster
 
 You can directly install the package from PyPI.
 ```
-pip3 install SpaGCN
+pip3 install GeneClust
 ```
 
 2. Github
