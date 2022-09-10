@@ -5,22 +5,68 @@
 # @Software: PyCharm
 import os
 import sys
+from functools import partial
+from itertools import combinations
+from multiprocessing import cpu_count
+from multiprocessing.pool import Pool
 from typing import Literal, Optional
 
 import anndata as ad
-import numpy as np
-import scanpy as sc
-from rpy2.robjects import globalenv, r
 import anndata2ri
+import numpy as np
+import pandas as pd
+import scanpy as sc
 from loguru import logger
+from rpy2.robjects import globalenv, r
+from scipy.spatial.distance import squareform
+from sklearn.metrics import pairwise_distances
+from sklearn.feature_selection import mutual_info_classif
 
 
 def _check_raw_counts(adata: ad.AnnData):
+    """Check whether the data in `adata.X` is raw counts"""
     if adata.raw is not None:
         raise ValueError("Expect count data in `.raw` as input.")
     else:
         if not np.all(adata.X % 1 == 0):
             raise ValueError("The input data in `.X` may have been normalized.")
+
+
+def _check_params(raw_adata, version, n_gene_clusters, n_cell_clusters, top_percent_rel, scale, verbosity, random_stat):
+    """Check the input parameters"""
+    _check_raw_counts(raw_adata)
+    if version == 'fast':
+        if n_gene_clusters is None:
+            raise ValueError("You must specify `n_gene_clusters` in GeneClust-fast.")
+        if n_cell_clusters is not None:
+            raise UserWarning("The parameter `n_cell_clusters` doesn't need to be specified and is ignored.")
+        if top_percent_rel is not None:
+            raise UserWarning("The parameter `top_percent_relevance` doesn't need to be specified and is ignored.")
+        if scale is not None:
+            raise UserWarning("The parameter `scale` doesn't need to be specified and is ignored.")
+    elif version == 'ps':
+        if n_gene_clusters is not None:
+            raise UserWarning("The parameter `n_gene_clusters` doesn't need to be specified and is ignored.")
+        if n_cell_clusters is None:
+            raise ValueError("You must specify `n_cell_clusters` in GeneClust-ps.")
+        if top_percent_rel is None:
+            raise ValueError("You must specify `top_percent_relevance` in GeneClust-ps.")
+        if scale is None:
+            raise ValueError("You must specify `scale` in GeneClust-ps.")
+    else:
+        raise ValueError("The parameter `version` can only be `fast` or `ps`.")
+
+    if verbosity not in (0, 1, 2):
+        raise ValueError("The parameter `verbosity` can only be 0, 1, 2.")
+    if random_stat is not None and not isinstance(random_stat, int):
+        raise ValueError("The parameter `random_stat` must be None or an integer.")
+
+
+def _check_all_selected(selected_genes, raw_adata):
+    is_selected = np.isin(raw_adata.var_names, selected_genes)
+    if is_selected.sum() != selected_genes.shape[0]:
+        msg = f"Only found {is_selected.sum()} selected genes in `adata.var_names`, not {selected_genes.shape[0]}."
+        raise RuntimeError(msg)
 
 
 def load_example_adata(min_genes: int = 200, min_cells: int = 3) -> ad.AnnData:
@@ -43,13 +89,7 @@ def set_logger(verbosity: Literal[0, 1, 2] = 1):
     """
     Set the verbosity level.
 
-    Parameters
-    ----------
-    verbosity
-      integer in [0, 1, 2]. 0: only print warnings and errors; 1: also print info; 2: also print debug message
-    Returns
-    -------
-
+    :param verbosity: 0 (only print warnings and errors), 1 (also print info), 2 (also print debug messages)
     """
 
     def formatter(record: dict):
@@ -68,48 +108,64 @@ def set_logger(verbosity: Literal[0, 1, 2] = 1):
 
 def select_from_clusters(
         adata: ad.AnnData,
-        mode: str,
+        version: str,
 ) -> np.ndarray:
     assert 'cluster' in adata.var, KeyError(f"Column not found in `.var`: 'cluster'")
     assert 'score' in adata.var, KeyError(f"Column not found in `.var`: 'score'")
     df = adata.var.loc[:, ('cluster', 'score')].rename_axis('gene')
     grouped = df.groupby(by='cluster')['score']
-    if mode == 'fast':
+    if version == 'fast':
         max_genes = grouped.nlargest(1).reset_index(level=1)['gene'].values
         min_genes = grouped.nsmallest(1).reset_index(level=1)['gene'].values
         selected_features = np.unique(np.concatenate([max_genes, min_genes]))  # the max and min values may be the same
     else:
-        selected_features = adata.var.index
+        selected_features = adata.var_names[adata.var['representative']]
     logger.debug(f"Selected {selected_features.shape[0]} features")
     return selected_features
 
 
-def prepare_GO(raw_adata: ad.AnnData, save: Optional[str] = None, name=None, save_type='Rdata'):
-    assert 'original_gene' in raw_adata.var, ValueError("Column 'original_gene' not in adata.var")
-    assert 'cluster' in raw_adata.var and 'score' in raw_adata.var, ValueError("Must run `scGeneClust` first!")
+def compute_cluster_distance(
+        adata: ad.AnnData,
+        use_rep=None,
+        point_distance: str = 'euclidean',
+        cluster_distance: Literal['centroid', 'average', 'complete', 'single'] = 'centroid',
+        inplace: bool = True
+):
+    mtx = adata.layers['X_gene_scale'].T if use_rep is None else adata.varm['pca']  # genes as rows
+    uclusters = np.sort(adata.var['cluster'].unique())
+    if cluster_distance == 'centroid':
+        centroids = np.vstack([mtx[adata.var['cluster'] == cluster, :].mean(axis=0) for cluster in uclusters])
+        cluster_dis_mtx = pairwise_distances(centroids, metric=point_distance, n_jobs=-1)  # (n_clusters, n_clusters)
+    else:
+        gene_dis_mtx = pairwise_distances(mtx, metric=point_distance, n_jobs=-1)  # shape: (n_genes, n_genes)
+        pool = Pool(processes=cpu_count() - 1)
+        partial_compute = partial(
+            compute_cluster_pair_distance,
+            clusters=adata.var['cluster'].values, cluster_dis=cluster_distance, gene_dis_mtx=gene_dis_mtx
+        )
+        cluster_dis_mtx = squareform(pool.starmap(partial_compute, combinations(uclusters, 2)))
 
-    sc.pp.highly_variable_genes(raw_adata, n_top_genes=500, flavor='seurat_v3')
-    if save is not None:
-        if not os.path.exists(save):
-            os.makedirs(save)
+    if inplace:
+        adata.uns['gene_cluster_distances'] = pd.DataFrame(cluster_dis_mtx, index=uclusters, columns=uclusters)
+    else:
+        return pd.DataFrame(cluster_dis_mtx, index=uclusters, columns=uclusters)
 
-        if name is None:
-            if 'data_name' not in raw_adata.uns:
-                name = 'data'
-            else:
-                name = raw_adata.uns['data_name']
-        if save_type == 'csv':
-            path_to_save = os.path.join(save, f"{name}.csv")
-            raw_adata.var.loc[:, ['original_gene', 'cluster', 'score', 'variances_norm']].to_csv(path_to_save,
-                                                                                                 index=False)
-        else:
-            path_to_save = os.path.join(save, f"{name}.Rdata")
-            anndata2ri.activate()
-            globalenv['sce'], globalenv['path'] = anndata2ri.py2rpy(raw_adata), path_to_save
-            r("""
-            save(sce, file = path)
-            """)
-            anndata2ri.deactivate()
 
-        logger.info(f"data has been saved at {path_to_save}")
-    logger.info("Preparation done!")
+def compute_cluster_pair_distance(cluster_1, cluster_2, clusters, cluster_dis, gene_dis_mtx):
+    cluster_pair_dis_mtx = gene_dis_mtx[np.ix_(clusters == cluster_1, clusters == cluster_2)]
+    if cluster_dis == 'average':
+        return cluster_pair_dis_mtx.mean()
+    elif cluster_dis == 'complete':
+        return cluster_pair_dis_mtx.max()
+    else:
+        return cluster_pair_dis_mtx.min()
+
+
+def compute_cluster_rep_gene_rel(adata: ad.AnnData, seed=None):
+    uclusters = np.sort(adata.var['cluster'].unique())
+    centroids = np.hstack(
+        [adata.layers['X_gene_scale'][:, adata.var['cluster'] == cluster].mean(axis=1).reshape(-1, 1) for cluster in
+         uclusters])
+    relevance = mutual_info_classif(centroids, adata.obs.cluster, discrete_features=False, random_state=seed)
+    adata.uns['gene_cluster_centroid_relevance'] = pd.DataFrame(relevance, index=uclusters.astype(str),
+                                                                columns=['relevance'])

@@ -3,9 +3,8 @@
 # @Author : Tory Deng
 # @File : confidence.py
 # @Software: PyCharm
-
-import os
 from functools import partial
+from multiprocessing import cpu_count
 from multiprocessing.pool import ThreadPool
 from typing import Literal, Optional, Union
 
@@ -46,12 +45,12 @@ def leiden(
     directed = False if np.allclose(adjacency, adjacency.T) else True
     logger.debug(f"Creating {'directed' if directed else 'undirected'} graph on {on}...")
     G = sc._utils.get_igraph_from_adjacency(adjacency, directed=directed)
-    logger.debug("Leiden clustering starts...")
+    logger.debug("Leiden gene_clustering_graph starts...")
     partition = leidenalg.find_partition(G, partition_type=leidenalg.RBConfigurationVertexPartition,
                                          weights=G.es['weight'],
                                          n_iterations=-1, resolution_parameter=resolution, seed=seed)
     cluster_labels = np.array(partition.membership)
-    logger.debug("Leiden clustering finished!")
+    logger.debug("Leiden gene_clustering_graph finished!")
     return cluster_labels
 
 
@@ -80,25 +79,22 @@ def _compute_cell_co_membership(
 def find_high_confidence_cells(
         adata: ad.AnnData,
         n_cell_clusters: int,
-        high_prob: float = 0.95,
-        high_freq: int = 8,
-        min_cluster_size: int = 10,
         random_stat: Optional[int] = None,
 ):
-    logger.info(f"Start to find high-confidence cells...")
+    logger.info(f"Finding high-confidence cells...")
 
     # compute the frequency matrix
-    pool = ThreadPool(processes=os.cpu_count() - 1)
+    pool = ThreadPool(processes=cpu_count() - 1)
     top_comps = [adata.obsm['pca'][:, :i] for i in range(2, 12)]
-    partial_compute = partial(_compute_cell_co_membership, n_clusters=n_cell_clusters, seed=random_stat, p=high_prob)
+    partial_compute = partial(_compute_cell_co_membership, n_clusters=n_cell_clusters, seed=random_stat, p=0.95)
     results = pool.map(partial_compute, top_comps)
     frequency_matrix = squareform(np.sum(results, axis=0))
 
-    for freq_th in range(high_freq, 0, -1):
+    for freq_th in range(8, 0, -1):
         cut_matrix = np.where(frequency_matrix < freq_th, 0, frequency_matrix)
         cluster_labels = leiden(cut_matrix, seed=random_stat, on='cell')
         cluster_counts = pd.Series(cluster_labels).value_counts(ascending=False)
-        cut_k = min(n_cell_clusters, np.argwhere((cluster_counts < min_cluster_size).values).squeeze()[0])
+        cut_k = min(n_cell_clusters, np.argwhere((cluster_counts > 10).values).squeeze()[0])
         valid_clusters = cluster_counts.index[:cut_k]
         is_confident = np.isin(cluster_labels, valid_clusters)
         if is_confident.sum() / is_confident.shape[0] > 0.05:

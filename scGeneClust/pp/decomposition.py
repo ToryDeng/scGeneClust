@@ -12,16 +12,20 @@ from sklearn.decomposition import PCA
 
 def reduce_dimension(
         adata: ad.AnnData,
-        mode: Literal['fast', 'hc'],
-        n_comps: int,
+        version: Literal['fast', 'ps'],
         random_stat: Optional[int],
 ):
-    logger.info("Start to reduce dimension...")
-    pca_gene = PCA(n_components=n_comps, random_state=random_stat)
-    adata.varm['pca'] = pca_gene.fit_transform(adata.layers['X_gene_scale'].T)
-    if mode == 'fast':
-        pass
+    """
+
+    :param adata: The annotated data matrix
+    :param version: Version of GeneClust
+    :param random_stat: Change to use different initial states for the optimization
+    """
+    logger.info("Reducing data dimension...")
+    if version == 'fast':
+        pca_gene = PCA(n_components=50, random_state=random_stat)
+        adata.varm['pca'] = pca_gene.fit_transform(adata.layers['X_gene_scale'].T)
     else:
-        pca_cell = PCA(n_components=n_comps, random_state=random_stat)
+        pca_cell = PCA(n_components=50, random_state=random_stat)
         adata.obsm['pca'] = pca_cell.fit_transform(adata.layers['X_cell_scale'])
     logger.info("Dimension reduction finished!")

@@ -4,60 +4,61 @@
 # @File : _model.py
 # @Software: PyCharm
 from typing import Literal, Optional
-
 import anndata as ad
 import numpy as np
-from sklearn.cluster import MiniBatchKMeans
 
 import scGeneClust.pp as pp
 import scGeneClust.tl as tl
-from loguru import logger
-from .utils import _check_raw_counts, set_logger, select_from_clusters, prepare_GO
+from .utils import set_logger, select_from_clusters, _check_params, _check_all_selected
 
 
 def scGeneClust(
         raw_adata: ad.AnnData,
-        mode: Literal['fast', 'hc'] = 'fast',
-        n_components: int = 50,
+        version: Literal['fast', 'ps'] = 'fast',
         n_gene_clusters: Optional[int] = None,
         n_cell_clusters: Optional[int] = None,
+        top_percent_relevance: Optional[int] = None,
+        scale: Optional[int] = None,
         verbosity: Literal[0, 1, 2] = 1,
-        rlv_threshold: float = 0.01,
-        scale: int = 2000,
         random_stat: Optional[int] = None
 ):
+    """
+    The main function of GeneClust.
+
+    :param raw_adata: GeneClust expects raw counts data.
+    :param version: The version of GeneClust.
+    :param n_gene_clusters: The number of gene clusters. Only used in GeneClust-fast.
+    :param n_cell_clusters: The number of cell clusters. Only used in GeneClust-ps.
+    :param top_percent_relevance: What percentage of genes with top relevance should be preserved.
+    :param scale: The scale factor used in the partition of MST
+    :param verbosity: The verbosity level
+    :param random_stat: Change to use different initial states for the optimization
+    :return:
+    """
     set_logger(verbosity)
-    _check_raw_counts(raw_adata)
+    _check_params(raw_adata, version, n_gene_clusters, n_cell_clusters, top_percent_relevance, scale,
+                  verbosity, random_stat)
 
     copied = raw_adata.copy()
-    # preprocessing
-    pp.preprocess(copied, mode)
-    pp.reduce_dimension(copied, mode, n_components, random_stat)
+    copied.raw = raw_adata
 
-    if mode == 'fast':
-        km = MiniBatchKMeans(n_clusters=n_gene_clusters, random_state=random_stat)
-        copied.var['cluster'] = km.fit_predict(copied.varm['pca'])  # gene clustering
-        copied.var['score'] = tl.compute_gene_closeness(copied, km.cluster_centers_)
-        tl.handle_single_gene_cluster(copied, mode, random_stat)
+    # preprocessing
+    pp.preprocess(copied, version)
+    pp.reduce_dimension(copied, version, random_stat)
+
+    # gene clustering
+    if version == 'fast':
+        tl.gene_clustering_mbkmeans(copied, n_gene_clusters, random_stat)
+        tl.handle_single_gene_cluster(copied, version, random_stat)
         tl.filter_constant_genes(copied)
     else:
-        tl.find_high_confidence_cells(copied, n_cell_clusters=n_cell_clusters, random_stat=random_stat)
+        tl.find_high_confidence_cells(copied, n_cell_clusters, random_stat)
         tl.filter_low_confidence_cells(copied)
-        tl.filter_irrelevant_gene(copied, rlv_threshold, random_stat)
-        tl.clustering(copied, scale, random_stat)
-        tl.handle_single_gene_cluster(copied, mode='hc', random_stat=random_stat)
+        tl.filter_irrelevant_gene(copied, top_percent_relevance, random_stat)
+        tl.gene_clustering_graph(copied, scale, random_stat)
+        tl.handle_single_gene_cluster(copied, version, random_stat)
 
-    selected_genes = select_from_clusters(copied, mode)
-
-    # TODO: remove this preparation for GO analysis
-    # prepare_GO(copied, save='cache/')
-    # if 'disease_related' in copied.var:
-    #     copied.var.groupby('cluster')['disease_related'].value_counts().to_excel('cache/disease_analysis.xlsx')
-    #     logger.info("disease analysis done!")
-
-    # check if all selected features are in var_names
-    is_selected = np.isin(raw_adata.var_names, selected_genes)
-    if is_selected.sum() != selected_genes.shape[0]:
-        raise RuntimeError(
-            f"Only found {is_selected.sum()} selected genes in adata.var_names, not {selected_genes.shape[0]}.")
+    # select features from gene clusters
+    selected_genes = select_from_clusters(copied, version)
+    _check_all_selected(selected_genes, raw_adata)
     return selected_genes

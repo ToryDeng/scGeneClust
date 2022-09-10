@@ -1,1 +1,1 @@
-# **scGeneClust**: single-cell feature selection via gene clustering
+# **scGeneClust**: single-cell feature selection via gene gene_clustering_graph

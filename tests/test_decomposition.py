@@ -14,9 +14,9 @@ def test_reduce_dimension():
     adata1 = load_example_adata().raw.to_adata()
     adata2 = adata1.copy()
     preprocess(adata1, 'fast')
-    preprocess(adata2, 'hc')
+    preprocess(adata2, 'ps')
     reduce_dimension(adata1, 'fast', n_comps=50, random_stat=42)
-    reduce_dimension(adata2, 'hc', n_comps=50, random_stat=42)
+    reduce_dimension(adata2, 'ps', n_comps=50, random_stat=42)
 
     assert 'pca' in adata1.varm and 'pca' not in adata1.obsm
     assert 'pca' in adata2.varm and 'pca' in adata2.obsm
