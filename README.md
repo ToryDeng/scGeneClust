@@ -42,3 +42,5 @@ For the step-by-step tutorial, please refer to the notebook:
 <br>
 https://github.com/ToryDeng/scGeneClust/blob/main/notebooks/tutorial.ipynb
 <br>
+## Reproducibility
+To reproduce the results presented in our paper, please go to https://github.com/ToryDeng/scGeneClust/tree/main/figures to download the outputs of GeneClust and code to generate the figures.
