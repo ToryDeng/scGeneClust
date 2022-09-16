@@ -37,6 +37,6 @@ setup(
         'scipy>=1.7.3',
         'leidenalg>=0.8.9'
     ],
-    packages=find_packages(),
+    packages=find_packages(exclude=('tests', 'figures')),
     zip_safe=False,
 )
