@@ -9,8 +9,10 @@ suppressWarnings(suppressMessages(library(patchwork)))
 suppressWarnings(suppressMessages(library(ggnewscale)))
 suppressWarnings(suppressMessages(library(ggrepel)))
 #paths#####
+go_ps_vst <- read.csv("./PBMCSLEctrl-ps_top_gene_100_GO_seurat_summary.csv")
 go_ps_ctrl <- read.csv("./PBMCSLEctrl-ps_cluster_top_gene100_GO_ctrl_summary[2000max].csv")
 go_ps_exper <- read.csv("./PBMCSLEctrl-ps_cluster_top_gene100_GO_exper_summary[2000max].csv")
+  
 go_fast_ctrl <- read.csv("./PBMCSLEctrl_cluster_top_gene100_GO_ctrl_summary.csv")
 go_fast_exper <- read.csv("./PBMCSLEctrl_cluster_top_gene100_GO_exper_summary.csv")
 
@@ -44,6 +46,10 @@ GO_point_plot <- function(method,pwnum){
     random <- go_fast_ctrl
     ps <- go_fast_exper
   }
+  if(method =="GO-vst"){
+    random <- go_ps_vst
+    ps <- go_ps_exper
+  }
   ## extract needed rows and columns
   random <- random[1:pwnum,c("ID","p.adjust","Count","auc","is_immune")]
   ps <- ps[1:pwnum,c("ID","p.adjust","Count","auc","is_immune")]
@@ -62,89 +68,129 @@ GO_point_plot <- function(method,pwnum){
   ## plots adjustment
   if(method == "GO-ps"){
     xl <-c(0.6,7)
+    yl <- c(0,1.05)
     size_lim <- c(0,10)
     size_br <- c(3,6,9)
-    plot_mar <- unit(c(0.5,1.5,0.5,0.5),'cm')
+    plot_mar <- unit(c(8,10,8,8),'pt')
+    method_lab <- c("GeneClust-ps","Random Selection")
+  }
+  
+  if(method == "GO-vst"){
+    xl <-c(0,34)
+    yl <- c(0.4,1.05)
+    size_lim <- c(0,30)
+    size_br <- c(10,20,30)
+    plot_mar <- unit(c(8,10,8,8),'pt')
+    method_lab <- c("GeneClust-ps","VST")
+    
   }
   if(method=="GO-fast"){
     xl <-c(0.5,8)
+    yl <- c(0,1.05)
     size_lim <- c(0,18)
     size_br <- c(5,10,15)
-    plot_mar <- unit(c(0.5,1.6,0.5,0.5),'cm')
+    plot_mar <- unit(c(8,10,8,8),'pt')
+    method_lab <- c("GeneClust-fast","Random Selection")
   }
   ## generate plot
     p00 <- ggplot(combine,aes(x = -log10(p.adjust), y = auc))+
            geom_point(aes(size = count1),color = "transparent",shape = 19)+
            scale_size_continuous(limits = size_lim,breaks = size_br,labels = c("","",""),
-                            range = c(-1.5,6),guide = guide_legend(order = 3,
-                                                                   override.aes = list(color = "black"),
-                                                                   title = "Count"))+
+                            range = c(-1.5/.pt,9/.pt),guide = "none")+
            new_scale("size")+
            geom_point(aes(size = count2),color = "transparent",shape = 17)+
            scale_size_continuous(limits = size_lim,breaks = size_br,
-                            range = c(-1.5,6),guide = guide_legend(order = 4,
+                            range = c(-1.5/.pt,9/.pt),guide = guide_legend(order = 4,
                                                                    override.aes = list(color = "black"),
                                                                    title = " "))+
            new_scale("size")+
            geom_point(aes(size = Count,color = recode,shape = method))+
-           geom_text_repel(aes(label = ID),color = "black",size = 2.5,max.overlaps = 30,
-                      segment.size = 0.3,force = 5,segment.color = "grey40")+
-           scale_size_continuous(limits = size_lim,breaks = size_br,
-                            range = c(-1.5,6),guide = "none")+
+           geom_text_repel(aes(label = ID),color = "black",size = 5.5/.pt,max.overlaps = 1000,
+                      segment.size = 0.7/.pt,force = 50,segment.color = "grey40",
+                      max.time = 0.8,max.iter = 20000,direction = "both")+
+           scale_size_continuous(limits = size_lim,breaks = size_br,labels = c("","",""),
+                            range = c(-1.5/.pt,9/.pt),guide = guide_legend(order = 3,
+                            override.aes = list(color = "black"),
+                            title = "Count")
+                            
+                            #,guide = "none"
+                            )+
            scale_shape_manual(values = c("ps" = 19,"random"=17),
-                         labels = c("Experiment","Control"))+
+                         labels = method_lab)+
            labs(shape = "Method")+
-           theme_classic()+ labs( x = "-log p.adjust", y = "AUC")+
-           coord_cartesian(ylim = c(0,1),xlim = xl,clip = "off")+
+           theme_bw()+ labs( x = "-log p.adjust", y = "AUC")+
+           coord_cartesian(ylim = yl,xlim = xl,clip = "off")+
+          # coord_cartesian(ylim = c(0,1.05),xlim = xl,clip = "off")+
            scale_color_steps(breaks = c(10),limits = c(0,100),
-                        labels = c(" "),high = "#f20c00" ,low = "#44cef6",
+                        labels = c("immune/SLE-related\n\nimmune/SLE-unrelated"),
+                        high = "#f20c00" ,low = "#44cef6",
                         name = "",na.value = "transparent")+
-           theme(axis.title = element_text(size = 12),
-                 axis.text = element_text(size = 10,color = "black"),
-                 legend.title = element_text(size = 12),
+           theme(axis.title = element_text(size = 8),
+                 axis.text = element_text(size = 7,color = "black"),
+                 axis.ticks = element_line(linewidth = 0.8/.pt,color = "black"), 
+                 legend.title = element_text(size = 8),
                  legend.background = element_rect(color= "transparent",fill = "transparent"),
                  legend.key= element_rect(color = "transparent", 
                                      fill = "transparent"),
-                 legend.text = element_text(size = 10),
+                 legend.text = element_text(size = 7),
+                 panel.border = element_blank(),
+                 axis.line.x.bottom = element_line(color="black", 
+                                                   linewidth= 0.8/.pt, linetype="solid"),
+                 axis.line.y.left = element_line(color="black", 
+                                                 linewidth= 0.8/.pt, linetype="solid"),
                  legend.position = "right",
+                 legend.key.height = unit(12, "pt"),
+                 legend.key.width = unit(6, "pt"),
+                 panel.grid= element_blank(),
                  plot.margin = plot_mar)+
-            guides(shape = guide_legend(order = 1,override.aes = list(size = 2.5)),
-                 color = guide_colorsteps(order = 2,reverse = T,barwidth = 1, barheight = 3),
+            guides(shape = guide_legend(order = 1,override.aes = list(size = 5/.pt)),
+                 color = guide_colorsteps(order = 2,reverse = T,
+                                          barwidth = 1.7/.pt, barheight = 5.5/.pt),
                  fill = "none")
-    if(method == "GO-ps"){
-      p0 <- p00 + annotate("text",label = "immune-related",x = 8.62,y = 0.56)+
-        annotate("text",label = "immune-unrelated",x = 8.72,y = 0.487)
-    }
-    if(method=="GO-fast"){
-      p0 <- p00 + annotate("text",label = "immune-related",x = 9.92,y = 0.56)+
-        annotate("text",label = "immune-unrelated",x = 10.04,y = 0.487)
-    }
+    # if(method == "GO-ps"){
+    #   p0 <- p00 + annotate("text",label = "immune-related",
+    #                        x = 8.72,y = 0.645,size = 7/.pt)+
+    #     annotate("text",label = "immune-unrelated",size = 7/.pt,
+    #              x = 8.82,y = 0.562)
+    # }
+    # if(method=="GO-fast"){
+    #   p0 <- p00 + annotate("text",label = "immune-related",size = 7/.pt,
+    #                        x = 10.02,y = 0.645)+
+    #     annotate("text",label = "immune-unrelated",size = 7/.pt,
+    #              x = 10.135,y = 0.562)
+    # }
   
   ## legend adjustment
-  legend <- g_legend(p0)
-  legend$grobs[[1]]$heights[1] <- unit(3, "cm")
-  legend$grobs[[2]]$heights[1] <- unit(3, "cm")
-  legend$grobs[[2]]$widths[1] <- unit(0.25, "cm")
-  legend$grobs[[3]]$heights[1] <- unit(3, "cm")
-  legend$grobs[[4]]$heights[1] <- unit(-3.348, "cm")
-  legend$grobs[[4]]$widths[1] <- unit(2, "cm")
+  legend <- g_legend(p00)
+  # grid.newpage()
+  # grid.draw(legend)
+  legend$grobs[[1]]$heights[1] <- unit(80, "pt")
+  legend$grobs[[2]]$heights[1] <- unit(50, "pt")
+  legend$grobs[[2]]$widths[1] <- unit(5, "pt")
+  legend$grobs[[3]]$heights[1] <- unit(50, "pt")
+  legend$grobs[[4]]$heights[1] <- unit(-88, "pt")
+  legend$grobs[[4]]$widths[1] <- unit(35, "pt")
   
+  p00_gtable <- ggplot_gtable(ggplot_build(p00))
+  leg <- which(sapply(p00_gtable$grobs, function(x) x$name) == "guide-box")
+  p00_gtable$grobs[[leg]] <- legend
   
-  p0_gtable <- ggplot_gtable(ggplot_build(p0))
-  leg <- which(sapply(p0_gtable$grobs, function(x) x$name) == "guide-box")
-  p0_gtable$grobs[[leg]] <- legend
-  
-  return(p0_gtable)
+  return(p00_gtable)
 }
 
 #generate figures#####
 ## show the 20 most significant GOBPs enriched in experimental group and control group.
 pwnum <- 20
-ggsave(filename = paste0("Figure 4 A",".png"),
+ggsave(filename = paste0("FIG4 A",".jpeg"),
        suppressWarnings(GO_point_plot("GO-ps",pwnum)),
-       dpi = 300,
-       height = 5,width = 8.5)
-ggsave(filename = paste0("Figure S8 A",".png"),
+       dpi = 500,quality = 100,
+       height = 3,width = 5.512,units = "in")
+ggsave(filename = paste0("FIGS8 A",".jpeg"),
        suppressWarnings(GO_point_plot("GO-fast",pwnum)),
-       dpi = 300,
-       height = 5,width = 8.5)
+       dpi = 500,quality = 100,
+       height = 3,width = 5.512,units = "in")
+
+ggsave(filename = paste0("PS&VST-GO",".jpeg"),
+       suppressWarnings(GO_point_plot("GO-vst",pwnum)),
+       dpi = 500,quality = 100,
+       height = 3,width = 5.512,units = "in")

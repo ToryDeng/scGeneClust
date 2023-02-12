@@ -7,14 +7,20 @@ suppressWarnings(suppressMessages(library(grid)))
 suppressWarnings(suppressMessages(library(ggrepel)))
 
 #paths#####
-ps_random <- read.csv("./PBMCSLEctrl-ps_cluster_top_gene100_KEGG_ctrl_summary[2000max].csv")
 ps_exp <- read.csv("./PBMCSLEctrl-ps_cluster_top_gene100_KEGG_exper_summary[2000max].csv")
+ps_random <- read.csv("./PBMCSLEctrl-ps_cluster_top_gene100_KEGG_ctrl_summary[2000max].csv")
+ps_vst <- read.csv("./PBMCSLEctrl-ps_top_gene_100_KEGG_seurat_summary.csv")
+
 ps_exp_group <- read_excel("./pbmcctrl-ps-kegg-diseases-sle.xlsx",
                            sheet = "ps")%>%select("Description","Relation")
+ps_vst_group <- read_excel("./pbmcctrl-ps-kegg-diseases-sle.xlsx",
+                             sheet = "Seurat")%>%select("Description","Relation")
 ps_random_group <- read_excel("./pbmcctrl-ps-kegg-diseases-sle.xlsx",
-                             sheet = "random")%>%select("Description","Relation")
+                              sheet = "random")%>%select("Description","Relation")
+
 fast_random <- read.csv("./PBMCSLEctrl_cluster_top_gene100_KEGG_ctrl_summary.csv")
 fast_exp <- read.csv("./PBMCSLEctrl_cluster_top_gene100_KEGG_exper_summary.csv")
+
 fast_exp_group <- read_excel("./pbmcctrl-fast-kegg-diseases-sle.xlsx",
                            sheet = "fast")%>%select("Description","Relation")
 fast_random_group <- read_excel("./pbmcctrl-fast-kegg-diseases-sle.xlsx",
@@ -47,14 +53,35 @@ KEGG_point_plot <- function(method,pwnum){
       exp <- ps_exp
       exp_group <- ps_exp_group 
       random_group <- ps_random_group
+      li <- c(0,15)
+      br <- c(5,10,15)
+      yl <- c(0,1.05)
+      xl <- c(0.2,7)
+      method_lab <- c("GeneClust-ps","Random Selection")
     }
     if(method =="KEGG-fast"){
       random <- fast_random 
       exp <- fast_exp
       exp_group <- fast_exp_group 
       random_group <- fast_random_group
+      li <- c(0,15)
+      br <- c(5,10,15)
+      yl <- c(0,1.05)
+      xl <- c(0.2,7)
+      method_lab <- c("GeneClust-fast","Random Selection")
     }
-  
+    
+    if(method =="KEGG-vst"){
+      random <- ps_vst
+      exp <- ps_exp
+      exp_group <- ps_exp_group 
+      random_group <- ps_vst_group
+      li <- c(0,24)
+      br <- c(8,16,24)
+      yl <- c(0.5,1.05)
+      xl <- c(0,22)
+      method_lab <- c("GeneClust-ps","VST")
+    }
     ## extract needed rows and columns
     random <-random[1:pwnum,c("ID","Description","p.adjust","Count","auc")]
     exp <- exp[1:pwnum,c("ID","Description","p.adjust","Count","auc")]
@@ -81,62 +108,73 @@ KEGG_point_plot <- function(method,pwnum){
     ## generate plot
     pcc <- ggplot(combine,aes(x = -log10(p.adjust), y = auc))+
             geom_point(aes(size = count1),color = "transparent",shape = 19)+
-            scale_size_continuous(limits = c(0,15),breaks = c(5,10,15),labels = c("","",""),
-                                  range = c(-1.5,6),guide = guide_legend(order = 3,
+            scale_size_continuous(limits = li,breaks = br,labels = c("","",""),
+                                  range = c(-1.5/.pt,9/.pt),guide = guide_legend(order = 3,
                                                                          override.aes = list(color = "black"),
                                                                          title = "Count"))+
             new_scale("size")+
             geom_point(aes(size = count2),color = "transparent",shape = 17)+
-            scale_size_continuous(limits = c(0,15),breaks = c(5,10,15),
-                                  range = c(-1.5,6),guide = guide_legend(order = 4,
+            scale_size_continuous(limits = li,breaks = br,
+                                  range = c(-1.5/.pt,9/.pt),guide = guide_legend(order = 4,
                                                                          override.aes = list(color = "black"),
                                                                          title = " "))+
             new_scale("size")+
             geom_point(aes(size = Count,color = recode,shape = method))+
-            geom_text_repel(aes(label = ID),color = combine$IDcol,size = 2.5,max.overlaps = 30,
-                            segment.size = 0.3,force = 5,segment.color = "grey40")+
-            scale_size_continuous(limits = c(0,15),breaks = c(5,10,15),
-                                  range = c(-1.5,6),guide = "none")+
+            geom_text_repel(aes(label = ID),color = combine$IDcol,size = 5.5/.pt,max.overlaps = 1000,
+                            segment.size = 0.7/.pt,force = 50,segment.color = "grey40",
+                            max.time = 0.8,max.iter = 20000,direction = "both")+
+            scale_size_continuous(limits = li,breaks = br,
+                                  range = c(-1.5/.pt,9/.pt),guide = "none")+
             scale_shape_manual(values = c("gc"=19 ,"random"=17),
-                               labels = c("Experiment","Control"))+
+                               labels = method_lab)+
             labs(shape = "Method")+
-            theme_classic()+ labs( x = "-log p.adjust", y = "AUC")+
-            coord_cartesian(ylim = c(0,1),xlim = c(0.2,7),clip = "off")+
+            theme_bw()+ labs( x = "-log p.adjust", y = "AUC")+
+            coord_cartesian(ylim = yl,xlim = xl,clip = "off")+
             scale_color_steps(breaks = c(50),limits = c(0,100),
-                              labels = c(" "),high = "#ff7500" ,low = "#00e09e",
+                              labels = c("SLE-related\n\nSLE-unrelated"),high = "#ff7500" ,low = "#00e09e",
                               name = "",na.value = "transparent")+
-            theme(axis.title = element_text(size = 12),
-                  axis.text = element_text(size = 10,color = "black"),
-                  legend.title = element_text(size = 12),
+            theme(axis.title = element_text(size = 8),
+                  axis.text = element_text(size = 7,color = "black"),
+                  axis.ticks = element_line(linewidth = 0.8/.pt,color = "black"), 
+                  legend.title = element_text(size = 8),
                   legend.background = element_rect(color= "transparent",fill = "transparent"),
                   legend.key= element_rect(color = "transparent", 
                                            fill = "transparent"),
-                  legend.text = element_text(size = 10),
+                  legend.text = element_text(size = 7),
+                  panel.border = element_blank(),
+                  axis.line.x.bottom = element_line(color="black", 
+                                                    linewidth = 0.8/.pt, linetype="solid"),
+                  axis.line.y.left = element_line(color="black", 
+                                                  linewidth= 0.8/.pt, linetype="solid"),
                   legend.position = "right",
-                  plot.margin = unit(c(0.5,0.7,0.5,0.5),'cm'))+
-            guides(shape = guide_legend(order = 1,override.aes = list(size = 2.5)),
-                   color = guide_colorsteps(order = 2,reverse = T,barwidth = 1, barheight = 3),
+                  legend.key.height = unit(12, "pt"),
+                  legend.key.width = unit(6, "pt"),
+                  panel.grid= element_blank(),
+                  plot.margin = unit(c(8,10,8,8),'pt'))+
+            guides(shape = guide_legend(order = 1,override.aes = list(size = 5/.pt)),
+                   color = guide_colorsteps(order = 2,reverse = T,
+                                            barwidth = 1.7/.pt, barheight = 5.5/.pt),
                    fill = "none")
-    pc <- pcc + annotate("text",label = "SLE-related",x = 8.5,y = 0.56)+
-                annotate("text",label = "SLE-unrelated",x = 8.6,y = 0.487)
+    # pc <- pcc + annotate("text",label = "SLE-related",x = 8.6,y = 0.625,size = 7/.pt)+
+    #             annotate("text",label = "SLE-unrelated",x = 8.698,y = 0.533,size = 7/.pt)
 
 
     ## legend adjustment
-    legend <- g_legend(pc)
-    legend$grobs[[1]]$heights[1] <- unit(3, "cm")
-    legend$grobs[[2]]$heights[1] <- unit(3, "cm")
-    legend$grobs[[2]]$widths[1] <- unit(0.25, "cm")
-    legend$grobs[[3]]$heights[1] <- unit(3, "cm")
-    legend$grobs[[4]]$heights[1] <- unit(-3.348, "cm")
-    legend$grobs[[4]]$widths[1] <- unit(2, "cm")
-    # grid.newpage()
-    # grid.draw(legend)
+    legend <- g_legend(pcc)
+    legend$grobs[[1]]$heights[1] <- unit(80, "pt")
+    legend$grobs[[2]]$heights[1] <- unit(50, "pt")
+    legend$grobs[[2]]$widths[1] <- unit(5, "pt")
+    legend$grobs[[3]]$heights[1] <- unit(50, "pt")
+    legend$grobs[[4]]$heights[1] <- unit(-88, "pt")
+    legend$grobs[[4]]$widths[1] <- unit(35, "pt")
+    grid.newpage()
+    grid.draw(legend)
     
-    pc_gtable <- ggplot_gtable(ggplot_build(pc))
-    leg <- which(sapply(pc_gtable$grobs, function(x) x$name) == "guide-box")
-    pc_gtable$grobs[[leg]] <- legend
+    pcc_gtable <- ggplot_gtable(ggplot_build(pcc))
+    leg <- which(sapply(pcc_gtable$grobs, function(x) x$name) == "guide-box")
+    pcc_gtable$grobs[[leg]] <- legend
     
-    return(pc_gtable)
+    return(pcc_gtable)
 
 }
 
@@ -144,13 +182,17 @@ KEGG_point_plot <- function(method,pwnum){
 ## show The 20 most significant KEGG pathways in experimental group and control group
 pwnum <- 20
 
-ggsave(filename = paste0("Figure 5 A",".png"),
+ggsave(filename = paste0("FIG5 A",".jpeg"),
        suppressWarnings(KEGG_point_plot("KEGG-ps",pwnum)),
-       dpi = 300,
-       height = 5,width = 8.5)
+       dpi = 500,quality = 100,
+       height = 3,width = 5.512,units = "in")
 
-ggsave(filename = paste0("Figure S9 A",".png"),
+ggsave(filename = paste0("FIGS9 A",".jpeg"),
        suppressWarnings(KEGG_point_plot("KEGG-fast",pwnum)),
-       dpi = 300,
-       height = 5,width = 8.5)
+       dpi = 500,quality = 100,
+       height = 3,width = 5.512,units = "in")
 
+ggsave(filename = paste0("PS&VST-KEGG",".jpeg"),
+       suppressWarnings(KEGG_point_plot("KEGG-vst",pwnum)),
+       dpi = 500,quality = 100,
+       height = 3,width = 5.512,units = "in")

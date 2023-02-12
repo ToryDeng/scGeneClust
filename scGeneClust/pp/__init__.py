@@ -4,5 +4,5 @@
 # @File : __init__.py.py
 # @Software: PyCharm
 
-from .decomposition import reduce_dimension
-from .preprocessing import preprocess
+
+from ._preprocessing import normalize, reduce_dim

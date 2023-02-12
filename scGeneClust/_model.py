@@ -3,62 +3,142 @@
 # @Author : Tory Deng
 # @File : _model.py
 # @Software: PyCharm
-from typing import Literal, Optional
+import os
+from typing import Literal, Optional, Union, Tuple
 
 import anndata as ad
+import numpy as np
+from loguru import logger
+from scipy.sparse import issparse
 
 import scGeneClust.pp as pp
 import scGeneClust.tl as tl
-from .utils import set_logger, select_from_clusters, _check_params, _check_all_selected
+from ._utils import set_logger
+from ._validation import check_args, check_all_genes_selected
 
 
 def scGeneClust(
         raw_adata: ad.AnnData,
+        image: np.ndarray = None,
+        n_var_clusters: int = None,
+        n_obs_clusters: int = None,
+        n_components: int = 10,
+        relevant_gene_pct: int = 20,
+        post_hoc_filtering: bool = True,
         version: Literal['fast', 'ps'] = 'fast',
-        n_gene_clusters: Optional[int] = None,
-        n_cell_clusters: Optional[int] = None,
-        top_percent_relevance: Optional[int] = None,
-        scale: Optional[int] = None,
+        modality: Literal['sc', 'st'] = 'sc',
+        shape: Literal['hexagon', 'square'] = 'hexagon',
+        return_info: bool = False,
+        subset: bool = False,
+        max_workers: int = os.cpu_count() - 1,
         verbosity: Literal[0, 1, 2] = 1,
-        random_stat: Optional[int] = None
-):
+        random_state: int = 0
+) -> Optional[Union[Tuple[ad.AnnData, np.ndarray], np.ndarray]]:
     """
-    The main function of GeneClust.
+    This function is the common interface for *GeneClust-fast* and *GeneClust-ps*.
 
-    :param raw_adata: The annotated matrix. GeneClust expects raw counts.
-    :param version: The version of GeneClust.
-    :param n_gene_clusters: The number of gene clusters. Only used in GeneClust-fast.
-    :param n_cell_clusters: The number of cell clusters. Only used in GeneClust-ps.
-    :param top_percent_relevance: What percentage of genes with top relevance should be preserved.
-    :param scale: The scale factor used in the partition of MST.
-    :param verbosity: The verbosity level.
-    :param random_stat: Change to use different initial states for the optimization.
-    :return: An ndarray of selected features.
+    Parameters
+    ----------
+    raw_adata : AnnData
+        The annotated data matrix of shape `n_obs` × `n_vars`.
+        Rows correspond to cells and columns to genes.
+        The raw counts should be in `raw_adata.X`.
+    image : ndarray
+        The image of tissue section.
+    n_var_clusters : int
+        The number of clusters in gene clustering. Only valid in GeneClust-fast.
+    n_obs_clusters : int
+        The number of clusters in cell clustering used to find high-confidence cells. Only valid in GeneClust-ps.
+    n_components : int, default=10
+        The number of principal components used along with the first component. Only valid in GeneClust-ps.
+    relevant_gene_pct: int, default=20
+        The percentage of relevant genes. This parameter should be between 0 and 100. Only valid in GeneClust-ps.
+    post_hoc_filtering : bool, default=True
+        Whether to find outliers in singleton gene clusters (in GeneClust-fast) or low-density genes (in GeneClust-ps)
+        after gene clustering.
+    version : Literal['fast', 'ps'], default='fast'
+        Choose the version of GeneClust.
+    modality : Literal['sc', 'st'], default='sc'
+        Type of the dataset. 'sc' for scRNA-seq data, 'st' for spatially resolved transcriptomics (SRT) data.
+    shape : Literal['hexagon', 'square'], default='hexagon'
+        The shape of spot neighbors. 'hexagon' for Visium data, 'square' for ST data.
+    return_info: bool, default=False
+        If `False`, only return names of selected genes.
+        Otherwise, return an `AnnData` object which contains intermediate results generated during feature selection.
+    subset: bool, default=False
+        If `True`, inplace subset to selected genes otherwise merely return the names of selected genes
+        (and intermediate results recorded in an `AnnData` object, depending on the value of `return_info`).
+    max_workers : int, default=os.cpu_count() - 1
+        The maximum value of workers which can be used during feature selection. Default is the number of CPUs - 1.
+    verbosity : Literal[0, 1, 2], default=1
+        The verbosity level.
+        If 0, only prints warnings and errors.
+        If 1, prints info-level messages, warnings and errors.
+        If 2, prints debug-level messages, info-level messages, warnings and errors.
+    random_state : int, default=0
+        Change to use different initial states for the optimization.
+
+    Returns
+    -------
+    Depending on `subset` and `return_info`, returns names of selected genes (and intermediate results),
+    or inplace subsets to selected genes and returns `None`.
+
+    copied_adata : AnnData
+        Stores intermediate results generated during feature selection.
+        The normalized counts are stored in `copied_adata.layers['pearson_norm']`.
+        The cell-level principal components are stored in `copied_adata.varm['X_pca']`.
+        The gene cluster labels are in `copied_adata.var['cluster']`.
+        For GeneClust-fast, the closeness of genes to their cluster centers are in `copied_adata.var['closeness']`.
+        For GeneClust-ps, the gene-level principal components are in `copied_adata.obsm['X_pca']`.
+        The high-confidence cell cluster labels are in `copied_adata.obs['cluster']`.
+        Low-confidence cell clusters are filtered.
+        Genes relevance values are in `copied_adata.var['relevance']`. Irrelevant genes are filtered.
+        Gene redundancy values are in `copied_adata.varp['redundancy']`.
+        MST edges are in `copied_adata.uns['mst_edges']` as an ndarray of shape (n_edges, 2).
+        Gene complementarity values are in `copied_adata.uns['mst_edges_complm']` as an ndarray of shape (n_edges, ).
+        Representative genes are indicated by `copied_adata.var['representative']`.
+    selected_genes : ndarray
+        Names of selected genes.s
+
+    Examples
+    -------
+    >>> from scGeneClust import scGeneClust, load_PBMC3k
+    >>>
+    >>>
+    >>> adata = load_PBMC3k()
+    >>> selected_genes_fast = scGeneClust(adata, version='fast', n_var_clusters=200)
+    >>> selected_genes_ps = scGeneClust(adata, version='ps', n_obs_clusters=7)
     """
+    # check arguments
+    check_args(raw_adata, image, version, n_var_clusters, n_obs_clusters, n_components, relevant_gene_pct,
+               post_hoc_filtering, modality, shape, return_info, subset, max_workers, verbosity, random_state)
+    # set log level
     set_logger(verbosity)
-    _check_params(raw_adata, version, n_gene_clusters, n_cell_clusters, top_percent_relevance, scale,
-                  verbosity, random_stat)
-
-    copied = raw_adata.copy()
-    copied.raw = raw_adata
+    # feature selection starts
+    logger.opt(colors=True).info(
+        f"Performing <magenta>GeneClust-{version}</magenta> "
+        f"on <magenta>{'scRNA-seq' if modality == 'sc' else 'SRT'}</magenta> data, "
+        f"with <yellow>{max_workers}</yellow> workers."
+    )
+    copied_adata = raw_adata.copy()
+    copied_adata.X = raw_adata.X.toarray() if issparse(raw_adata.X) else raw_adata.X
 
     # preprocessing
-    pp.preprocess(copied, version)
-    pp.reduce_dimension(copied, version, random_stat)
-
+    pp.normalize(copied_adata, modality)
+    pp.reduce_dim(copied_adata, version, random_state)
     # gene clustering
-    if version == 'fast':
-        tl.gene_clustering_mbkmeans(copied, n_gene_clusters, random_stat)
-        tl.handle_single_gene_cluster(copied, version, random_stat)
-        tl.filter_constant_genes(copied)
-    else:
-        tl.find_high_confidence_cells(copied, n_cell_clusters, random_stat)
-        tl.filter_low_confidence_cells(copied)
-        tl.filter_irrelevant_gene(copied, top_percent_relevance, random_stat)
-        tl.gene_clustering_graph(copied, scale, random_stat)
-        tl.handle_single_gene_cluster(copied, version, random_stat)
-
+    tl.cluster_genes(copied_adata, image, version, modality, shape, n_var_clusters, n_obs_clusters, n_components, relevant_gene_pct, max_workers, random_state)
     # select features from gene clusters
-    selected_genes = select_from_clusters(copied, version)
-    _check_all_selected(selected_genes, raw_adata)
-    return selected_genes
+    selected_genes = tl.select_from_clusters(copied_adata, version, post_hoc_filtering, random_state)
+    check_all_genes_selected(raw_adata, selected_genes)
+
+    if subset:
+        raw_adata._inplace_subset_var(selected_genes)
+        logger.opt(colors=True).info(f"<magenta>GeneClust-{version}</magenta> finished.")
+        return None
+
+    logger.opt(colors=True).info(f"GeneClust-{version} finished.")
+    if return_info:
+        return copied_adata, selected_genes
+    else:
+        return selected_genes

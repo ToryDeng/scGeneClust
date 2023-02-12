@@ -4,8 +4,6 @@
 # @File : __init__.py.py
 # @Software: PyCharm
 
-from ._utils import compute_gene_closeness
-from .cluster import gene_clustering_graph, gene_clustering_mbkmeans
-from .confidence import find_high_confidence_cells
-from .filtering import handle_single_gene_cluster, filter_constant_genes, filter_low_confidence_cells, \
-    filter_irrelevant_gene
+from .cluster import cluster_genes
+from .information import find_relevant_genes
+from .selection import select_from_clusters
